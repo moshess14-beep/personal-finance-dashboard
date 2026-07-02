@@ -9,6 +9,7 @@ export const useFinanceStore = create(
       assets: [],
       liabilities: [],
       monthlySavings: { totalAmount: 0, note: '' },
+      netWorthHistory: [],
 
       addAsset: (asset) =>
         set((s) => ({
@@ -45,11 +46,21 @@ export const useFinanceStore = create(
       setMonthlySavings: (patch) =>
         set((s) => ({ monthlySavings: { ...s.monthlySavings, ...patch } })),
 
+      recordNetWorthSnapshot: (netWorth) =>
+        set((s) => {
+          const today = new Date().toISOString().slice(0, 10)
+          const history = s.netWorthHistory.filter((h) => h.date !== today)
+          history.push({ date: today, netWorth })
+          history.sort((a, b) => a.date.localeCompare(b.date))
+          return { netWorthHistory: history }
+        }),
+
       replaceAll: (data) =>
         set({
           assets: data.assets ?? [],
           liabilities: data.liabilities ?? [],
           monthlySavings: data.monthlySavings ?? { totalAmount: 0, note: '' },
+          netWorthHistory: data.netWorthHistory ?? [],
         }),
     }),
     { name: 'pfd-finance-data' },
@@ -64,3 +75,16 @@ export const selectTotalLiabilities = (s) =>
 
 export const selectNetWorth = (s) =>
   selectTotalAssets(s) - selectTotalLiabilities(s)
+
+// Trend vs the most recent *previous* day we have a recorded snapshot for.
+// Today's own snapshot (recorded on this render) never counts as "previous".
+export const selectNetWorthTrend = (s) => {
+  const today = new Date().toISOString().slice(0, 10)
+  const past = s.netWorthHistory.filter((h) => h.date < today)
+  if (past.length === 0) return null
+  const previous = past[past.length - 1]
+  const current = selectNetWorth(s)
+  const delta = current - previous.netWorth
+  const percent = previous.netWorth !== 0 ? (delta / Math.abs(previous.netWorth)) * 100 : 0
+  return { delta, percent, sinceDate: previous.date }
+}
