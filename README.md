@@ -22,3 +22,7 @@ React + Vite, Tailwind CSS, Zustand, Recharts, Framer Motion.
 ## פריסה
 
 פריסה אוטומטית ל-GitHub Pages בכל push ל-`main`, דרך `.github/workflows/deploy.yml`.
+
+## תכנון עתידי
+
+ראו [ROADMAP.md](./ROADMAP.md) — מבנה הגרסאות, מודל הנתונים, והחלטות תכנון.
