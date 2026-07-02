@@ -32,11 +32,11 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/80">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+        <div className="flex shrink-0 items-center gap-2 font-semibold text-slate-900 dark:text-white">
           <TrendingUp className="size-5 text-brand-600 dark:text-brand-400" />
-          <span>מעקב הון אישי</span>
+          <span className="hidden sm:inline">מעקב הון אישי</span>
         </div>
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 overflow-x-auto">
           {LINKS.map((link) => (
             <NavItem key={link.to} {...link} />
           ))}

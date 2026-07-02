@@ -5,7 +5,7 @@ const now = () => new Date().toISOString()
 
 export const useFinanceStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       assets: [],
       liabilities: [],
       monthlySavings: { totalAmount: 0, note: '' },
