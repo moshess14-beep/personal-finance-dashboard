@@ -1,17 +1,17 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Landmark, CreditCard } from 'lucide-react'
+import { Landmark, CreditCard, PiggyBank } from 'lucide-react'
 import {
   useFinanceStore,
   selectTotalAssets,
   selectTotalLiabilities,
+  selectTotalMonthlySavings,
   selectNetWorth,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
 import { ASSET_CATEGORIES, LIABILITY_CATEGORIES } from '../utils/categories'
 import NetWorthHero from '../components/dashboard/NetWorthHero'
 import StatCard from '../components/dashboard/StatCard'
-import MonthlySavingsCard from '../components/dashboard/MonthlySavingsCard'
 import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
 import AssetsVsLiabilitiesMeter from '../components/dashboard/AssetsVsLiabilitiesMeter'
 import BackupControls from '../components/common/BackupControls'
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const liabilities = useFinanceStore((s) => s.liabilities)
   const totalAssets = useFinanceStore(selectTotalAssets)
   const totalLiabilities = useFinanceStore(selectTotalLiabilities)
+  const totalMonthlySavings = useFinanceStore(selectTotalMonthlySavings)
   const netWorth = useFinanceStore(selectNetWorth)
   const recordNetWorthSnapshot = useFinanceStore((s) => s.recordNetWorthSnapshot)
 
@@ -62,7 +63,14 @@ export default function Dashboard() {
           subLabel={`${liabilities.length} התחייבויות רשומות`}
           delay={0.1}
         />
-        <MonthlySavingsCard />
+        <StatCard
+          icon={PiggyBank}
+          label="חיסכון חודשי"
+          value={formatCurrency(totalMonthlySavings)}
+          subLabel={`כ־${formatCurrency(totalMonthlySavings * 12)} בשנה`}
+          delay={0.15}
+          to="/savings"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -70,20 +78,20 @@ export default function Dashboard() {
           title="חלוקת נכסים לפי קטגוריה"
           items={assets}
           categories={ASSET_CATEGORIES}
-          delay={0.15}
+          delay={0.2}
         />
         <CategoryDonutChart
           title="חלוקת התחייבויות לפי קטגוריה"
           items={liabilities}
           categories={LIABILITY_CATEGORIES}
-          delay={0.2}
+          delay={0.25}
         />
       </div>
 
       <AssetsVsLiabilitiesMeter
         totalAssets={totalAssets}
         totalLiabilities={totalLiabilities}
-        delay={0.25}
+        delay={0.3}
       />
 
       <BackupControls />

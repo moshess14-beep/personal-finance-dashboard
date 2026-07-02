@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Landmark, CreditCard, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, Landmark, CreditCard, PiggyBank, TrendingUp } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 
 const LINKS = [
   { to: '/', label: 'לוח בקרה', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'נכסים', icon: Landmark },
   { to: '/liabilities', label: 'התחייבויות', icon: CreditCard },
+  { to: '/savings', label: 'חיסכון חודשי', icon: PiggyBank },
 ]
 
 function NavItem({ to, label, icon: Icon, end }) {
@@ -13,9 +14,10 @@ function NavItem({ to, label, icon: Icon, end }) {
     <NavLink
       to={to}
       end={end}
+      aria-label={label}
       className={({ isActive }) =>
         [
-          'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          'flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3',
           isActive
             ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white',
@@ -23,7 +25,7 @@ function NavItem({ to, label, icon: Icon, end }) {
       }
     >
       <Icon className="size-4.5" />
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </NavLink>
   )
 }

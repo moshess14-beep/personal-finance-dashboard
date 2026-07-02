@@ -5,6 +5,7 @@ import { useThemeStore, applyThemeClass } from './store/useThemeStore'
 import Dashboard from './routes/Dashboard'
 import Assets from './routes/Assets'
 import Liabilities from './routes/Liabilities'
+import Savings from './routes/Savings'
 
 function App() {
   const isDark = useThemeStore((s) => s.isDark)
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/liabilities" element={<Liabilities />} />
+          <Route path="/savings" element={<Savings />} />
         </Routes>
       </main>
     </div>

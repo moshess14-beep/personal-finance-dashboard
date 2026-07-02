@@ -21,7 +21,7 @@ export default function BackupControls() {
     const backup = {
       assets: state.assets,
       liabilities: state.liabilities,
-      monthlySavings: state.monthlySavings,
+      savingsComponents: state.savingsComponents,
       netWorthHistory: state.netWorthHistory,
       exportedAt: new Date().toISOString(),
     }
