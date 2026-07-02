@@ -44,7 +44,7 @@ export default function AssetForm({ initialValues, onSubmit, onCancel, submitLab
           type="text"
           value={values.name}
           onChange={(e) => handleChange('name', e.target.value)}
-          placeholder='למשל: דירה, קרן השתלמות משה'
+          placeholder="למשל: דירה, קרן השתלמות"
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
         />
       </div>
