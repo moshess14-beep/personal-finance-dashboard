@@ -14,6 +14,7 @@ import StatCard from '../components/dashboard/StatCard'
 import MonthlySavingsCard from '../components/dashboard/MonthlySavingsCard'
 import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
 import AssetsVsLiabilitiesMeter from '../components/dashboard/AssetsVsLiabilitiesMeter'
+import BackupControls from '../components/common/BackupControls'
 
 export default function Dashboard() {
   const assets = useFinanceStore((s) => s.assets)
@@ -84,6 +85,8 @@ export default function Dashboard() {
         totalLiabilities={totalLiabilities}
         delay={0.25}
       />
+
+      <BackupControls />
     </div>
   )
 }
