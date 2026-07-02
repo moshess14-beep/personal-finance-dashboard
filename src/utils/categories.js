@@ -26,6 +26,15 @@ export const LIABILITY_CATEGORIES = [
   { id: 'other', label: 'אחר', color: MUTED },
 ]
 
+export const SAVINGS_CATEGORIES = [
+  { id: 'pension', label: 'פנסיה', color: { light: '#eda100', dark: '#c98500' } },
+  { id: 'kerenHishtalmut', label: 'קרן השתלמות', color: { light: '#4a3aa7', dark: '#9085e9' } },
+  { id: 'childSavings', label: 'חיסכון לכל ילד', color: { light: '#eb6834', dark: '#d95926' } },
+  { id: 'loanPrincipal', label: 'החזר קרן הלוואה', color: { light: '#1baf7a', dark: '#199e70' } },
+  { id: 'independentDeposit', label: 'הפקדה עצמאית', color: { light: '#e87ba4', dark: '#d55181' } },
+  { id: 'other', label: 'אחר', color: MUTED },
+]
+
 export function getCategoryLabel(categories, id) {
   return categories.find((c) => c.id === id)?.label ?? id
 }

@@ -3,12 +3,29 @@ import { persist } from 'zustand/middleware'
 
 const now = () => new Date().toISOString()
 
+// Converts the old single-field monthlySavings shape (pre savingsComponents
+// list) into one component, so upgrading the app or importing an old backup
+// never silently drops what the user already entered.
+function monthlySavingsToComponents(monthlySavings) {
+  if (!monthlySavings?.totalAmount) return []
+  return [
+    {
+      id: crypto.randomUUID(),
+      name: monthlySavings.note || 'חיסכון חודשי',
+      category: 'other',
+      amount: Number(monthlySavings.totalAmount) || 0,
+      note: '',
+      updatedAt: now(),
+    },
+  ]
+}
+
 export const useFinanceStore = create(
   persist(
     (set) => ({
       assets: [],
       liabilities: [],
-      monthlySavings: { totalAmount: 0, note: '' },
+      savingsComponents: [],
       netWorthHistory: [],
 
       addAsset: (asset) =>
@@ -43,8 +60,23 @@ export const useFinanceStore = create(
       deleteLiability: (id) =>
         set((s) => ({ liabilities: s.liabilities.filter((l) => l.id !== id) })),
 
-      setMonthlySavings: (patch) =>
-        set((s) => ({ monthlySavings: { ...s.monthlySavings, ...patch } })),
+      addSavingsComponent: (component) =>
+        set((s) => ({
+          savingsComponents: [
+            ...s.savingsComponents,
+            { id: crypto.randomUUID(), note: '', updatedAt: now(), ...component },
+          ],
+        })),
+      updateSavingsComponent: (id, patch) =>
+        set((s) => ({
+          savingsComponents: s.savingsComponents.map((c) =>
+            c.id === id ? { ...c, ...patch, updatedAt: now() } : c,
+          ),
+        })),
+      deleteSavingsComponent: (id) =>
+        set((s) => ({
+          savingsComponents: s.savingsComponents.filter((c) => c.id !== id),
+        })),
 
       recordNetWorthSnapshot: (netWorth) =>
         set((s) => {
@@ -59,16 +91,30 @@ export const useFinanceStore = create(
         set({
           assets: data.assets ?? [],
           liabilities: data.liabilities ?? [],
-          monthlySavings: data.monthlySavings ?? { totalAmount: 0, note: '' },
+          savingsComponents:
+            data.savingsComponents ?? monthlySavingsToComponents(data.monthlySavings),
           netWorthHistory: data.netWorthHistory ?? [],
         }),
     }),
-    { name: 'pfd-finance-data' },
+    {
+      name: 'pfd-finance-data',
+      version: 1,
+      migrate: (persistedState, version) => {
+        if (version === 0) {
+          const { monthlySavings, ...rest } = persistedState ?? {}
+          return { ...rest, savingsComponents: monthlySavingsToComponents(monthlySavings) }
+        }
+        return persistedState
+      },
+    },
   ),
 )
 
 export const selectTotalAssets = (s) =>
   s.assets.reduce((sum, a) => sum + Number(a.value || 0), 0)
+
+export const selectTotalMonthlySavings = (s) =>
+  s.savingsComponents.reduce((sum, c) => sum + Number(c.amount || 0), 0)
 
 export const selectTotalLiabilities = (s) =>
   s.liabilities.reduce((sum, l) => sum + Number(l.value || 0), 0)
