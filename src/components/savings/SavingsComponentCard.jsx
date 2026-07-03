@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatRelativeDate } from '../../utils/formatDate'
 import { getCategoryColor, SAVINGS_CATEGORIES } from '../../utils/categories'
 import { useThemeStore } from '../../store/useThemeStore'
 
@@ -24,9 +25,14 @@ export default function SavingsComponentCard({ component, onEdit, onDelete }) {
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">{component.note}</p>
         )}
       </div>
-      <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
-        {formatCurrency(component.amount)}
-      </p>
+      <div>
+        <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+          {formatCurrency(component.amount)}
+        </p>
+        <p className="whitespace-nowrap text-[11px] text-slate-400 dark:text-slate-500">
+          עודכן {formatRelativeDate(component.updatedAt)}
+        </p>
+      </div>
       <div className="flex items-center gap-1">
         <button
           type="button"

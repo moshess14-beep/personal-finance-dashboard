@@ -35,6 +35,15 @@ export const SAVINGS_CATEGORIES = [
   { id: 'other', label: 'אחר', color: MUTED },
 ]
 
+export const INCOME_CATEGORIES = [
+  { id: 'work', label: 'עבודה', color: { light: '#2a78d6', dark: '#3987e5' } },
+  { id: 'business', label: 'עסק', color: { light: '#1baf7a', dark: '#199e70' } },
+  { id: 'rental', label: 'שכירות', color: { light: '#eda100', dark: '#c98500' } },
+  { id: 'benefits', label: 'קצבאות', color: { light: '#008300', dark: '#008300' } },
+  { id: 'capitalMarket', label: 'שוק ההון', color: { light: '#4a3aa7', dark: '#9085e9' } },
+  { id: 'other', label: 'אחר', color: MUTED },
+]
+
 export function getCategoryLabel(categories, id) {
   return categories.find((c) => c.id === id)?.label ?? id
 }

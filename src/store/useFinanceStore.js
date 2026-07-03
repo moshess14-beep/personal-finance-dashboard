@@ -26,6 +26,8 @@ export const useFinanceStore = create(
       assets: [],
       liabilities: [],
       savingsComponents: [],
+      incomeSources: [],
+      historyPoints: [],
       netWorthHistory: [],
 
       addAsset: (asset) =>
@@ -78,6 +80,42 @@ export const useFinanceStore = create(
           savingsComponents: s.savingsComponents.filter((c) => c.id !== id),
         })),
 
+      addIncomeSource: (source) =>
+        set((s) => ({
+          incomeSources: [
+            ...s.incomeSources,
+            { id: crypto.randomUUID(), note: '', updatedAt: now(), ...source },
+          ],
+        })),
+      updateIncomeSource: (id, patch) =>
+        set((s) => ({
+          incomeSources: s.incomeSources.map((c) =>
+            c.id === id ? { ...c, ...patch, updatedAt: now() } : c,
+          ),
+        })),
+      deleteIncomeSource: (id) =>
+        set((s) => ({
+          incomeSources: s.incomeSources.filter((c) => c.id !== id),
+        })),
+
+      addHistoryPoint: (point) =>
+        set((s) => ({
+          historyPoints: [
+            ...s.historyPoints,
+            { id: crypto.randomUUID(), note: '', updatedAt: now(), ...point },
+          ],
+        })),
+      updateHistoryPoint: (id, patch) =>
+        set((s) => ({
+          historyPoints: s.historyPoints.map((p) =>
+            p.id === id ? { ...p, ...patch, updatedAt: now() } : p,
+          ),
+        })),
+      deleteHistoryPoint: (id) =>
+        set((s) => ({
+          historyPoints: s.historyPoints.filter((p) => p.id !== id),
+        })),
+
       recordNetWorthSnapshot: (netWorth) =>
         set((s) => {
           const today = new Date().toISOString().slice(0, 10)
@@ -93,6 +131,8 @@ export const useFinanceStore = create(
           liabilities: data.liabilities ?? [],
           savingsComponents:
             data.savingsComponents ?? monthlySavingsToComponents(data.monthlySavings),
+          incomeSources: data.incomeSources ?? [],
+          historyPoints: data.historyPoints ?? [],
           netWorthHistory: data.netWorthHistory ?? [],
         }),
     }),
@@ -115,6 +155,19 @@ export const selectTotalAssets = (s) =>
 
 export const selectTotalMonthlySavings = (s) =>
   s.savingsComponents.reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+export const selectTotalMonthlyIncome = (s) =>
+  s.incomeSources.reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+// Most recent updatedAt across all live financial data (not history points,
+// which are deliberate past checkpoints rather than "current" records).
+export const selectLastUpdatedAt = (s) => {
+  const timestamps = [...s.assets, ...s.liabilities, ...s.savingsComponents, ...s.incomeSources]
+    .map((item) => item.updatedAt)
+    .filter(Boolean)
+  if (timestamps.length === 0) return null
+  return timestamps.reduce((latest, ts) => (ts > latest ? ts : latest))
+}
 
 export const selectTotalLiabilities = (s) =>
   s.liabilities.reduce((sum, l) => sum + Number(l.value || 0), 0)
