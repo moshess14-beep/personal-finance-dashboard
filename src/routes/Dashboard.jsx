@@ -21,6 +21,8 @@ import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
 import AssetsVsLiabilitiesMeter from '../components/dashboard/AssetsVsLiabilitiesMeter'
 import BackupControls from '../components/common/BackupControls'
 
+const sinceDateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short', year: '2-digit' })
+
 export default function Dashboard() {
   const assets = useFinanceStore((s) => s.assets)
   const liabilities = useFinanceStore((s) => s.liabilities)
@@ -44,6 +46,17 @@ export default function Dashboard() {
   const hasAnyData = assets.length > 0 || liabilities.length > 0
   const topIncomeCategory = summarizeByCategory(incomeSources, INCOME_CATEGORIES, 'light', 'amount')[0]
 
+  // The chart should always reach "now", not stop at whatever date the last
+  // manual history point happens to be. historyPoints themselves are frozen
+  // snapshots and must never be mutated here - this only appends an extra,
+  // unsaved point built from the live totals for rendering.
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const hasTodayHistoryPoint = historyPoints.some((p) => p.date === todayStr)
+  const chartPoints =
+    historyPoints.length > 0 && !hasTodayHistoryPoint
+      ? [...historyPoints, { id: 'live-today', date: todayStr, totalAssets, totalLiabilities, isLive: true }]
+      : historyPoints
+
   return (
     <div className="space-y-4">
       <NetWorthHero />
@@ -58,7 +71,7 @@ export default function Dashboard() {
         </p>
       )}
 
-      <NetWorthProgressChart points={historyPoints} delay={0.05} />
+      <NetWorthProgressChart points={chartPoints} delay={0.05} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
@@ -104,8 +117,8 @@ export default function Dashboard() {
           }
           subLabel={
             monthlyGrowth
-              ? `${monthlyGrowth.amount >= 0 ? '+' : ''}${monthlyGrowth.percent.toFixed(1)}% בחודש`
-              : 'נדרשות 2+ נקודות היסטוריה'
+              ? `${monthlyGrowth.amount >= 0 ? '+' : ''}${monthlyGrowth.percent.toFixed(1)}% בחודש, לעומת ${sinceDateFormatter.format(new Date(monthlyGrowth.sinceDate))}`
+              : 'נדרשת נקודת היסטוריה בת 14+ יום'
           }
           delay={0.22}
           to="/history"

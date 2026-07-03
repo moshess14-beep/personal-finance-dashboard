@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -13,28 +14,26 @@ import { TrendingUp } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatCompactCurrency } from '../../utils/formatCompactCurrency'
 
-// Axis ticks stay compact (day+month) within a single year, but switch to
-// including the year once history spans more than one - otherwise e.g. two
-// "1 בינואר" points a year apart look identical on the axis.
-const shortDateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short' })
-const shortDateWithYearFormatter = new Intl.DateTimeFormat('he-IL', {
-  day: 'numeric',
-  month: 'short',
-  year: '2-digit',
-})
-const fullDateFormatter = new Intl.DateTimeFormat('he-IL', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-})
+// Axis always shows month + year (never just a bare month name, which is
+// ambiguous once history spans more than one year).
+const axisFormatter = new Intl.DateTimeFormat('he-IL', { month: 'short', year: 'numeric' })
+const fullDateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })
+
+const GAIN_COLOR = '#0ca30c'
+const LOSS_COLOR = '#d03b3b'
 
 function ProgressTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const row = payload[0].payload
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-800">
-      <p className="mb-0.5 text-slate-500 dark:text-slate-400">
+      <p className="mb-0.5 flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
         {fullDateFormatter.format(new Date(row.date))}
+        {row.isLive && (
+          <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
+            היום
+          </span>
+        )}
       </p>
       <p className="font-semibold tabular-nums text-slate-900 dark:text-white">
         {formatCurrency(row.netWorth)}
@@ -43,17 +42,33 @@ function ProgressTooltip({ active, payload }) {
   )
 }
 
+function makeDot(color) {
+  return function ChartDot(props) {
+    const { cx, cy, payload } = props
+    if (payload.isLive) {
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={7} fill="white" stroke={color} strokeWidth={2.5} className="dark:fill-slate-900" />
+          <circle cx={cx} cy={cy} r={2.5} fill={color} />
+        </g>
+      )
+    }
+    return <circle cx={cx} cy={cy} r={3} fill={color} strokeWidth={0} />
+  }
+}
+
 export default function NetWorthProgressChart({ points, delay = 0 }) {
   const sorted = [...points]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((p) => ({
       date: p.date,
       netWorth: Number(p.totalAssets || 0) - Number(p.totalLiabilities || 0),
+      isLive: Boolean(p.isLive),
     }))
 
-  const spansMultipleYears =
-    new Set(sorted.map((p) => new Date(p.date).getFullYear())).size > 1
-  const axisFormatter = spansMultipleYears ? shortDateWithYearFormatter : shortDateFormatter
+  const trendColor =
+    sorted.length >= 2 && sorted.at(-1).netWorth < sorted[0].netWorth ? LOSS_COLOR : GAIN_COLOR
+  const gradientId = trendColor === GAIN_COLOR ? 'netWorthGradientGain' : 'netWorthGradientLoss'
 
   return (
     <motion.div
@@ -72,8 +87,8 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
           <p className="max-w-xs text-sm text-slate-500 dark:text-slate-400">
             {sorted.length === 0
               ? 'עדיין אין נקודות היסטוריה.'
-              : 'יש רק נקודה אחת עדיין.'}{' '}
-            הוסף לפחות שתי נקודות היסטוריה כדי לראות את גרף ההתקדמות שלך.
+              : 'יש רק נקודה אחת עדיין, מתאריך היום.'}{' '}
+            הוסף לפחות נקודת היסטוריה אחת מהעבר כדי לראות את גרף ההתקדמות שלך.
           </p>
           <Link
             to="/history"
@@ -83,9 +98,15 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
           </Link>
         </div>
       ) : (
-        <div className="h-56">
+        <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sorted} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+            <ComposedChart data={sorted} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={trendColor} stopOpacity={0.22} />
+                  <stop offset="100%" stopColor={trendColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="0"
                 vertical={false}
@@ -98,6 +119,7 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
                 className="fill-slate-400 dark:fill-slate-500"
                 axisLine={false}
                 tickLine={false}
+                minTickGap={24}
               />
               <YAxis
                 tickFormatter={(v) => formatCompactCurrency(v)}
@@ -108,15 +130,23 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
                 width={56}
               />
               <Tooltip content={<ProgressTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="netWorth"
+                stroke="none"
+                fill={`url(#${gradientId})`}
+                isAnimationActive={false}
+              />
               <Line
                 type="monotone"
                 dataKey="netWorth"
-                stroke="#6366f1"
-                strokeWidth={2}
-                dot={{ r: 3, fill: '#6366f1', strokeWidth: 0 }}
+                stroke={trendColor}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                dot={makeDot(trendColor)}
                 activeDot={{ r: 5 }}
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
