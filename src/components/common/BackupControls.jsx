@@ -22,6 +22,8 @@ export default function BackupControls() {
       assets: state.assets,
       liabilities: state.liabilities,
       savingsComponents: state.savingsComponents,
+      incomeSources: state.incomeSources,
+      historyPoints: state.historyPoints,
       netWorthHistory: state.netWorthHistory,
       exportedAt: new Date().toISOString(),
     }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatRelativeDate } from '../../utils/formatDate'
 import { getCategoryColor, LIABILITY_CATEGORIES } from '../../utils/categories'
 import { useThemeStore } from '../../store/useThemeStore'
 
@@ -24,9 +25,14 @@ export default function LiabilityCard({ liability, onEdit, onDelete }) {
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">{liability.notes}</p>
         )}
       </div>
-      <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
-        {formatCurrency(liability.value)}
-      </p>
+      <div>
+        <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+          {formatCurrency(liability.value)}
+        </p>
+        <p className="whitespace-nowrap text-[11px] text-slate-400 dark:text-slate-500">
+          עודכן {formatRelativeDate(liability.updatedAt)}
+        </p>
+      </div>
       <div className="flex items-center gap-1">
         <button
           type="button"

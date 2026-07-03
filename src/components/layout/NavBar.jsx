@@ -1,12 +1,22 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Landmark, CreditCard, PiggyBank, TrendingUp } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Landmark,
+  CreditCard,
+  PiggyBank,
+  Wallet,
+  History,
+  TrendingUp,
+} from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 
 const LINKS = [
   { to: '/', label: 'לוח בקרה', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'נכסים', icon: Landmark },
   { to: '/liabilities', label: 'התחייבויות', icon: CreditCard },
+  { to: '/income', label: 'הכנסות', icon: Wallet },
   { to: '/savings', label: 'חיסכון חודשי', icon: PiggyBank },
+  { to: '/history', label: 'היסטוריה', icon: History },
 ]
 
 function NavItem({ to, label, icon: Icon, end }) {

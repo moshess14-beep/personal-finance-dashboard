@@ -1,7 +1,14 @@
 import { motion } from 'framer-motion'
+import { useShallow } from 'zustand/react/shallow'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { useFinanceStore, selectNetWorth, selectNetWorthTrend } from '../../store/useFinanceStore'
+import {
+  useFinanceStore,
+  selectNetWorth,
+  selectNetWorthTrend,
+  selectLastUpdatedAt,
+} from '../../store/useFinanceStore'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatRelativeDate } from '../../utils/formatDate'
 import { useCountUp } from '../../utils/useCountUp'
 
 const dateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' })
@@ -12,9 +19,13 @@ function formatSince(dateStr) {
 
 export default function NetWorthHero() {
   const netWorth = useFinanceStore(selectNetWorth)
-  const trend = useFinanceStore(selectNetWorthTrend)
+  // selectNetWorthTrend returns a fresh object each call; useShallow keeps the
+  // snapshot referentially stable when its contents haven't actually changed,
+  // otherwise useSyncExternalStore treats it as "always changing" and loops.
+  const trend = useFinanceStore(useShallow(selectNetWorthTrend))
   const assetsCount = useFinanceStore((s) => s.assets.length)
   const liabilitiesCount = useFinanceStore((s) => s.liabilities.length)
+  const lastUpdatedAt = useFinanceStore(selectLastUpdatedAt)
   const animated = useCountUp(netWorth)
 
   const isPositiveTrend = trend && trend.delta >= 0
@@ -57,6 +68,7 @@ export default function NetWorthHero() {
 
       <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
         מבוסס על {assetsCount} נכסים ו־{liabilitiesCount} התחייבויות
+        {lastUpdatedAt && <> · עודכן לאחרונה {formatRelativeDate(lastUpdatedAt)}</>}
       </p>
     </motion.div>
   )

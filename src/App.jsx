@@ -6,6 +6,8 @@ import Dashboard from './routes/Dashboard'
 import Assets from './routes/Assets'
 import Liabilities from './routes/Liabilities'
 import Savings from './routes/Savings'
+import History from './routes/History'
+import Income from './routes/Income'
 
 function App() {
   const isDark = useThemeStore((s) => s.isDark)
@@ -23,6 +25,8 @@ function App() {
           <Route path="/assets" element={<Assets />} />
           <Route path="/liabilities" element={<Liabilities />} />
           <Route path="/savings" element={<Savings />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/income" element={<Income />} />
         </Routes>
       </main>
     </div>
