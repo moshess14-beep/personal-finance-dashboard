@@ -6,6 +6,7 @@ import {
   PiggyBank,
   Wallet,
   History,
+  Clock,
   TrendingUp,
 } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
@@ -17,6 +18,7 @@ const LINKS = [
   { to: '/income', label: 'הכנסות', icon: Wallet },
   { to: '/savings', label: 'חיסכון חודשי', icon: PiggyBank },
   { to: '/history', label: 'היסטוריה', icon: History },
+  { to: '/timeline', label: 'ציר זמן', icon: Clock },
 ]
 
 function NavItem({ to, label, icon: Icon, end }) {
@@ -35,7 +37,7 @@ function NavItem({ to, label, icon: Icon, end }) {
       }
     >
       <Icon className="size-4.5" />
-      <span className="hidden sm:inline">{label}</span>
+      <span className="hidden xl:inline">{label}</span>
     </NavLink>
   )
 }

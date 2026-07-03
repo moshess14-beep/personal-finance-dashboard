@@ -13,7 +13,20 @@ import { TrendingUp } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatCompactCurrency } from '../../utils/formatCompactCurrency'
 
-const dateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short' })
+// Axis ticks stay compact (day+month) within a single year, but switch to
+// including the year once history spans more than one - otherwise e.g. two
+// "1 בינואר" points a year apart look identical on the axis.
+const shortDateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short' })
+const shortDateWithYearFormatter = new Intl.DateTimeFormat('he-IL', {
+  day: 'numeric',
+  month: 'short',
+  year: '2-digit',
+})
+const fullDateFormatter = new Intl.DateTimeFormat('he-IL', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
 
 function ProgressTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
@@ -21,7 +34,7 @@ function ProgressTooltip({ active, payload }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-800">
       <p className="mb-0.5 text-slate-500 dark:text-slate-400">
-        {dateFormatter.format(new Date(row.date))}
+        {fullDateFormatter.format(new Date(row.date))}
       </p>
       <p className="font-semibold tabular-nums text-slate-900 dark:text-white">
         {formatCurrency(row.netWorth)}
@@ -37,6 +50,10 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
       date: p.date,
       netWorth: Number(p.totalAssets || 0) - Number(p.totalLiabilities || 0),
     }))
+
+  const spansMultipleYears =
+    new Set(sorted.map((p) => new Date(p.date).getFullYear())).size > 1
+  const axisFormatter = spansMultipleYears ? shortDateWithYearFormatter : shortDateFormatter
 
   return (
     <motion.div
@@ -76,7 +93,7 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
               />
               <XAxis
                 dataKey="date"
-                tickFormatter={(d) => dateFormatter.format(new Date(d))}
+                tickFormatter={(d) => axisFormatter.format(new Date(d))}
                 tick={{ fontSize: 11 }}
                 className="fill-slate-400 dark:fill-slate-500"
                 axisLine={false}

@@ -4,7 +4,9 @@ import { useFinanceStore } from '../store/useFinanceStore'
 import LiabilityForm from '../components/liabilities/LiabilityForm'
 import LiabilityList from '../components/liabilities/LiabilityList'
 import LiabilityCategorySummary from '../components/liabilities/LiabilityCategorySummary'
+import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
+import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Liabilities() {
   const liabilities = useFinanceStore((s) => s.liabilities)
@@ -14,6 +16,7 @@ export default function Liabilities() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [message, showMessage] = useTransientMessage()
 
   const total = liabilities.reduce((sum, l) => sum + Number(l.value || 0), 0)
 
@@ -41,12 +44,15 @@ export default function Liabilities() {
         )}
       </div>
 
+      <SuccessMessage message={message} />
+
       {showAddForm && (
         <LiabilityForm
           submitLabel="הוסף התחייבות"
           onSubmit={(data) => {
             addLiability(data)
             setShowAddForm(false)
+            showMessage(`ההתחייבות "${data.name}" נוספה בהצלחה`)
           }}
           onCancel={() => setShowAddForm(false)}
         />
@@ -64,9 +70,14 @@ export default function Liabilities() {
         onSaveEdit={(id, data) => {
           updateLiability(id, data)
           setEditingId(null)
+          showMessage(`השינויים ב"${data.name}" נשמרו`)
         }}
         onCancelEdit={() => setEditingId(null)}
-        onDelete={(id) => deleteLiability(id)}
+        onDelete={(id) => {
+          const liability = liabilities.find((l) => l.id === id)
+          deleteLiability(id)
+          showMessage(liability ? `ההתחייבות "${liability.name}" נמחקה` : 'ההתחייבות נמחקה')
+        }}
       />
     </div>
   )

@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Landmark, CreditCard, PiggyBank, Wallet } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
+import { Landmark, CreditCard, PiggyBank, Wallet, TrendingUp } from 'lucide-react'
 import {
   useFinanceStore,
   selectTotalAssets,
   selectTotalLiabilities,
   selectTotalMonthlySavings,
   selectTotalMonthlyIncome,
+  selectMonthlyNetWorthGrowth,
   selectNetWorth,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
@@ -28,6 +30,7 @@ export default function Dashboard() {
   const totalLiabilities = useFinanceStore(selectTotalLiabilities)
   const totalMonthlySavings = useFinanceStore(selectTotalMonthlySavings)
   const totalMonthlyIncome = useFinanceStore(selectTotalMonthlyIncome)
+  const monthlyGrowth = useFinanceStore(useShallow(selectMonthlyNetWorthGrowth))
   const netWorth = useFinanceStore(selectNetWorth)
   const recordNetWorthSnapshot = useFinanceStore((s) => s.recordNetWorthSnapshot)
 
@@ -57,7 +60,7 @@ export default function Dashboard() {
 
       <NetWorthProgressChart points={historyPoints} delay={0.05} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           icon={Landmark}
           label="סך נכסים"
@@ -91,6 +94,21 @@ export default function Dashboard() {
           subLabel={`כ־${formatCurrency(totalMonthlySavings * 12)} בשנה`}
           delay={0.19}
           to="/savings"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="גידול חודשי בהון"
+          value={monthlyGrowth ? formatCurrency(monthlyGrowth.amount) : 'אין מספיק נתונים'}
+          valueClassName={
+            monthlyGrowth ? (monthlyGrowth.amount >= 0 ? 'text-gain' : 'text-loss') : undefined
+          }
+          subLabel={
+            monthlyGrowth
+              ? `${monthlyGrowth.amount >= 0 ? '+' : ''}${monthlyGrowth.percent.toFixed(1)}% בחודש`
+              : 'נדרשות 2+ נקודות היסטוריה'
+          }
+          delay={0.22}
+          to="/history"
         />
       </div>
 

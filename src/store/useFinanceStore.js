@@ -1,7 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { formatCurrency } from '../utils/formatCurrency'
 
 const now = () => new Date().toISOString()
+
+// Single source of truth for which store keys are actual user data (as
+// opposed to actions/functions). Backup export and replaceAll both derive
+// from this list, so adding a new persisted array only means adding it here
+// once - not also remembering to touch the export code separately.
+export const BACKUP_DATA_KEYS = [
+  'assets',
+  'liabilities',
+  'savingsComponents',
+  'incomeSources',
+  'historyPoints',
+  'netWorthHistory',
+  'activityLog',
+]
+
+function activityEntry(entityType, action, summary) {
+  return { id: crypto.randomUUID(), entityType, action, summary, timestamp: now() }
+}
 
 // Converts the old single-field monthlySavings shape (pre savingsComponents
 // list) into one component, so upgrading the app or importing an old backup
@@ -29,38 +48,81 @@ export const useFinanceStore = create(
       incomeSources: [],
       historyPoints: [],
       netWorthHistory: [],
+      activityLog: [],
 
       addAsset: (asset) =>
-        set((s) => ({
-          assets: [
-            ...s.assets,
-            { id: crypto.randomUUID(), notes: '', updatedAt: now(), ...asset },
-          ],
-        })),
+        set((s) => {
+          const item = { id: crypto.randomUUID(), notes: '', updatedAt: now(), ...asset }
+          return {
+            assets: [...s.assets, item],
+            activityLog: [
+              ...s.activityLog,
+              activityEntry('asset', 'created', `נוסף נכס: ${item.name} (${formatCurrency(item.value)})`),
+            ],
+          }
+        }),
       updateAsset: (id, patch) =>
-        set((s) => ({
-          assets: s.assets.map((a) =>
-            a.id === id ? { ...a, ...patch, updatedAt: now() } : a,
-          ),
-        })),
+        set((s) => {
+          const assets = s.assets.map((a) => (a.id === id ? { ...a, ...patch, updatedAt: now() } : a))
+          const item = assets.find((a) => a.id === id)
+          return {
+            assets,
+            activityLog: item
+              ? [
+                  ...s.activityLog,
+                  activityEntry('asset', 'updated', `עודכן נכס: ${item.name} (${formatCurrency(item.value)})`),
+                ]
+              : s.activityLog,
+          }
+        }),
       deleteAsset: (id) =>
-        set((s) => ({ assets: s.assets.filter((a) => a.id !== id) })),
+        set((s) => {
+          const item = s.assets.find((a) => a.id === id)
+          return {
+            assets: s.assets.filter((a) => a.id !== id),
+            activityLog: item
+              ? [...s.activityLog, activityEntry('asset', 'deleted', `נמחק נכס: ${item.name}`)]
+              : s.activityLog,
+          }
+        }),
 
       addLiability: (liability) =>
-        set((s) => ({
-          liabilities: [
-            ...s.liabilities,
-            { id: crypto.randomUUID(), notes: '', updatedAt: now(), ...liability },
-          ],
-        })),
+        set((s) => {
+          const item = { id: crypto.randomUUID(), notes: '', updatedAt: now(), ...liability }
+          return {
+            liabilities: [...s.liabilities, item],
+            activityLog: [
+              ...s.activityLog,
+              activityEntry('liability', 'created', `נוספה התחייבות: ${item.name} (${formatCurrency(item.value)})`),
+            ],
+          }
+        }),
       updateLiability: (id, patch) =>
-        set((s) => ({
-          liabilities: s.liabilities.map((l) =>
+        set((s) => {
+          const liabilities = s.liabilities.map((l) =>
             l.id === id ? { ...l, ...patch, updatedAt: now() } : l,
-          ),
-        })),
+          )
+          const item = liabilities.find((l) => l.id === id)
+          return {
+            liabilities,
+            activityLog: item
+              ? [
+                  ...s.activityLog,
+                  activityEntry('liability', 'updated', `עודכנה התחייבות: ${item.name} (${formatCurrency(item.value)})`),
+                ]
+              : s.activityLog,
+          }
+        }),
       deleteLiability: (id) =>
-        set((s) => ({ liabilities: s.liabilities.filter((l) => l.id !== id) })),
+        set((s) => {
+          const item = s.liabilities.find((l) => l.id === id)
+          return {
+            liabilities: s.liabilities.filter((l) => l.id !== id),
+            activityLog: item
+              ? [...s.activityLog, activityEntry('liability', 'deleted', `נמחקה התחייבות: ${item.name}`)]
+              : s.activityLog,
+          }
+        }),
 
       addSavingsComponent: (component) =>
         set((s) => ({
@@ -81,30 +143,59 @@ export const useFinanceStore = create(
         })),
 
       addIncomeSource: (source) =>
-        set((s) => ({
-          incomeSources: [
-            ...s.incomeSources,
-            { id: crypto.randomUUID(), note: '', updatedAt: now(), ...source },
-          ],
-        })),
+        set((s) => {
+          const item = { id: crypto.randomUUID(), note: '', updatedAt: now(), ...source }
+          return {
+            incomeSources: [...s.incomeSources, item],
+            activityLog: [
+              ...s.activityLog,
+              activityEntry('income', 'created', `נוסף מקור הכנסה: ${item.name} (${formatCurrency(item.amount)})`),
+            ],
+          }
+        }),
       updateIncomeSource: (id, patch) =>
-        set((s) => ({
-          incomeSources: s.incomeSources.map((c) =>
+        set((s) => {
+          const incomeSources = s.incomeSources.map((c) =>
             c.id === id ? { ...c, ...patch, updatedAt: now() } : c,
-          ),
-        })),
+          )
+          const item = incomeSources.find((c) => c.id === id)
+          return {
+            incomeSources,
+            activityLog: item
+              ? [
+                  ...s.activityLog,
+                  activityEntry('income', 'updated', `עודכן מקור הכנסה: ${item.name} (${formatCurrency(item.amount)})`),
+                ]
+              : s.activityLog,
+          }
+        }),
       deleteIncomeSource: (id) =>
-        set((s) => ({
-          incomeSources: s.incomeSources.filter((c) => c.id !== id),
-        })),
+        set((s) => {
+          const item = s.incomeSources.find((c) => c.id === id)
+          return {
+            incomeSources: s.incomeSources.filter((c) => c.id !== id),
+            activityLog: item
+              ? [...s.activityLog, activityEntry('income', 'deleted', `נמחק מקור הכנסה: ${item.name}`)]
+              : s.activityLog,
+          }
+        }),
 
       addHistoryPoint: (point) =>
-        set((s) => ({
-          historyPoints: [
-            ...s.historyPoints,
-            { id: crypto.randomUUID(), note: '', updatedAt: now(), ...point },
-          ],
-        })),
+        set((s) => {
+          const item = { id: crypto.randomUUID(), note: '', updatedAt: now(), ...point }
+          const netWorth = Number(item.totalAssets || 0) - Number(item.totalLiabilities || 0)
+          return {
+            historyPoints: [...s.historyPoints, item],
+            activityLog: [
+              ...s.activityLog,
+              activityEntry(
+                'historyPoint',
+                'created',
+                `נוספה נקודת היסטוריה ל-${item.date} (שווי נקי: ${formatCurrency(netWorth)})`,
+              ),
+            ],
+          }
+        }),
       updateHistoryPoint: (id, patch) =>
         set((s) => ({
           historyPoints: s.historyPoints.map((p) =>
@@ -134,6 +225,7 @@ export const useFinanceStore = create(
           incomeSources: data.incomeSources ?? [],
           historyPoints: data.historyPoints ?? [],
           netWorthHistory: data.netWorthHistory ?? [],
+          activityLog: data.activityLog ?? [],
         }),
     }),
     {
@@ -174,6 +266,28 @@ export const selectTotalLiabilities = (s) =>
 
 export const selectNetWorth = (s) =>
   selectTotalAssets(s) - selectTotalLiabilities(s)
+
+// Monthly net worth growth, normalized from the two most recent history
+// points. Requires a real gap between them (>= 14 days) so a couple of
+// points entered minutes apart doesn't extrapolate into a wild number.
+// Returns null when there isn't enough data yet - callers show "אין מספיק
+// נתונים" in that case. Returns a fresh object each call; wrap with
+// zustand's useShallow when selecting this directly in a component.
+export const selectMonthlyNetWorthGrowth = (s) => {
+  if (s.historyPoints.length < 2) return null
+  const sorted = [...s.historyPoints].sort((a, b) => a.date.localeCompare(b.date))
+  const [prev, latest] = sorted.slice(-2)
+  const daysDiff = (new Date(latest.date) - new Date(prev.date)) / 86_400_000
+  if (daysDiff < 14) return null
+
+  const netWorthPrev = Number(prev.totalAssets || 0) - Number(prev.totalLiabilities || 0)
+  const netWorthLatest = Number(latest.totalAssets || 0) - Number(latest.totalLiabilities || 0)
+  const totalDelta = netWorthLatest - netWorthPrev
+  const monthlyAmount = totalDelta / (daysDiff / 30.44)
+  const percent = netWorthPrev !== 0 ? (monthlyAmount / Math.abs(netWorthPrev)) * 100 : 0
+
+  return { amount: monthlyAmount, percent }
+}
 
 // Trend vs the most recent *previous* day we have a recorded snapshot for.
 // Today's own snapshot (recorded on this render) never counts as "previous".

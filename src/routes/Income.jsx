@@ -4,7 +4,9 @@ import { useFinanceStore, selectTotalMonthlyIncome } from '../store/useFinanceSt
 import IncomeSourceForm from '../components/income/IncomeSourceForm'
 import IncomeSourceList from '../components/income/IncomeSourceList'
 import IncomeCategorySummary from '../components/income/IncomeCategorySummary'
+import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
+import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Income() {
   const sources = useFinanceStore((s) => s.incomeSources)
@@ -15,6 +17,7 @@ export default function Income() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [message, showMessage] = useTransientMessage()
 
   return (
     <div className="space-y-6">
@@ -40,12 +43,15 @@ export default function Income() {
         )}
       </div>
 
+      <SuccessMessage message={message} />
+
       {showAddForm && (
         <IncomeSourceForm
           submitLabel="הוסף מקור הכנסה"
           onSubmit={(data) => {
             addIncomeSource(data)
             setShowAddForm(false)
+            showMessage(`מקור ההכנסה "${data.name}" נוסף בהצלחה`)
           }}
           onCancel={() => setShowAddForm(false)}
         />
@@ -63,9 +69,14 @@ export default function Income() {
         onSaveEdit={(id, data) => {
           updateIncomeSource(id, data)
           setEditingId(null)
+          showMessage(`השינויים ב"${data.name}" נשמרו`)
         }}
         onCancelEdit={() => setEditingId(null)}
-        onDelete={(id) => deleteIncomeSource(id)}
+        onDelete={(id) => {
+          const source = sources.find((c) => c.id === id)
+          deleteIncomeSource(id)
+          showMessage(source ? `מקור ההכנסה "${source.name}" נמחק` : 'מקור ההכנסה נמחק')
+        }}
       />
     </div>
   )

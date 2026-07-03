@@ -4,7 +4,9 @@ import { useFinanceStore } from '../store/useFinanceStore'
 import AssetForm from '../components/assets/AssetForm'
 import AssetList from '../components/assets/AssetList'
 import AssetCategorySummary from '../components/assets/AssetCategorySummary'
+import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
+import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Assets() {
   const assets = useFinanceStore((s) => s.assets)
@@ -14,6 +16,7 @@ export default function Assets() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [message, showMessage] = useTransientMessage()
 
   const total = assets.reduce((sum, a) => sum + Number(a.value || 0), 0)
 
@@ -41,12 +44,15 @@ export default function Assets() {
         )}
       </div>
 
+      <SuccessMessage message={message} />
+
       {showAddForm && (
         <AssetForm
           submitLabel="הוסף נכס"
           onSubmit={(data) => {
             addAsset(data)
             setShowAddForm(false)
+            showMessage(`הנכס "${data.name}" נוסף בהצלחה`)
           }}
           onCancel={() => setShowAddForm(false)}
         />
@@ -64,9 +70,14 @@ export default function Assets() {
         onSaveEdit={(id, data) => {
           updateAsset(id, data)
           setEditingId(null)
+          showMessage(`השינויים ב"${data.name}" נשמרו`)
         }}
         onCancelEdit={() => setEditingId(null)}
-        onDelete={(id) => deleteAsset(id)}
+        onDelete={(id) => {
+          const asset = assets.find((a) => a.id === id)
+          deleteAsset(id)
+          showMessage(asset ? `הנכס "${asset.name}" נמחק` : 'הנכס נמחק')
+        }}
       />
     </div>
   )
