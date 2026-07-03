@@ -267,26 +267,32 @@ export const selectTotalLiabilities = (s) =>
 export const selectNetWorth = (s) =>
   selectTotalAssets(s) - selectTotalLiabilities(s)
 
-// Monthly net worth growth, normalized from the two most recent history
-// points. Requires a real gap between them (>= 14 days) so a couple of
-// points entered minutes apart doesn't extrapolate into a wild number.
-// Returns null when there isn't enough data yet - callers show "אין מספיק
-// נתונים" in that case. Returns a fresh object each call; wrap with
-// zustand's useShallow when selecting this directly in a component.
+// Monthly net worth growth, anchored against the *live* current net worth
+// (not just the last two manually-entered points, which would go stale the
+// moment the user stops adding history points close together). The anchor
+// is the most recent past history point that is at least 14 days old - old
+// enough that a single day's edit doesn't extrapolate into a wild number,
+// but recent enough to reflect what's actually changed since. Returns null
+// when no such anchor exists yet - callers show "אין מספיק נתונים" in that
+// case. Returns a fresh object each call; wrap with zustand's useShallow
+// when selecting this directly in a component.
 export const selectMonthlyNetWorthGrowth = (s) => {
-  if (s.historyPoints.length < 2) return null
-  const sorted = [...s.historyPoints].sort((a, b) => a.date.localeCompare(b.date))
-  const [prev, latest] = sorted.slice(-2)
-  const daysDiff = (new Date(latest.date) - new Date(prev.date)) / 86_400_000
-  if (daysDiff < 14) return null
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayDate = new Date(todayStr)
+  const anchor = [...s.historyPoints]
+    .filter((p) => p.date < todayStr)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .find((p) => (todayDate - new Date(p.date)) / 86_400_000 >= 14)
+  if (!anchor) return null
 
-  const netWorthPrev = Number(prev.totalAssets || 0) - Number(prev.totalLiabilities || 0)
-  const netWorthLatest = Number(latest.totalAssets || 0) - Number(latest.totalLiabilities || 0)
-  const totalDelta = netWorthLatest - netWorthPrev
+  const anchorNetWorth = Number(anchor.totalAssets || 0) - Number(anchor.totalLiabilities || 0)
+  const liveNetWorth = selectNetWorth(s)
+  const daysDiff = (todayDate - new Date(anchor.date)) / 86_400_000
+  const totalDelta = liveNetWorth - anchorNetWorth
   const monthlyAmount = totalDelta / (daysDiff / 30.44)
-  const percent = netWorthPrev !== 0 ? (monthlyAmount / Math.abs(netWorthPrev)) * 100 : 0
+  const percent = anchorNetWorth !== 0 ? (monthlyAmount / Math.abs(anchorNetWorth)) * 100 : 0
 
-  return { amount: monthlyAmount, percent }
+  return { amount: monthlyAmount, percent, sinceDate: anchor.date }
 }
 
 // Trend vs the most recent *previous* day we have a recorded snapshot for.
