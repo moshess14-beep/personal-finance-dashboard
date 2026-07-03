@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Download, Upload, ShieldCheck, TriangleAlert } from 'lucide-react'
-import { useFinanceStore } from '../../store/useFinanceStore'
+import { useFinanceStore, BACKUP_DATA_KEYS } from '../../store/useFinanceStore'
 
 function isValidBackup(data) {
   return (
@@ -18,15 +18,8 @@ export default function BackupControls() {
 
   function handleExport() {
     const state = useFinanceStore.getState()
-    const backup = {
-      assets: state.assets,
-      liabilities: state.liabilities,
-      savingsComponents: state.savingsComponents,
-      incomeSources: state.incomeSources,
-      historyPoints: state.historyPoints,
-      netWorthHistory: state.netWorthHistory,
-      exportedAt: new Date().toISOString(),
-    }
+    const backup = Object.fromEntries(BACKUP_DATA_KEYS.map((key) => [key, state[key]]))
+    backup.exportedAt = new Date().toISOString()
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

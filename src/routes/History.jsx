@@ -3,6 +3,10 @@ import { Plus } from 'lucide-react'
 import { useFinanceStore } from '../store/useFinanceStore'
 import HistoryPointForm from '../components/history/HistoryPointForm'
 import HistoryPointList from '../components/history/HistoryPointList'
+import SuccessMessage from '../components/common/SuccessMessage'
+import { useTransientMessage } from '../utils/useTransientMessage'
+
+const dateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default function History() {
   const points = useFinanceStore((s) => s.historyPoints)
@@ -12,6 +16,7 @@ export default function History() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [message, showMessage] = useTransientMessage()
 
   return (
     <div className="space-y-6">
@@ -37,12 +42,15 @@ export default function History() {
         )}
       </div>
 
+      <SuccessMessage message={message} />
+
       {showAddForm && (
         <HistoryPointForm
           submitLabel="הוסף נקודה"
           onSubmit={(data) => {
             addHistoryPoint(data)
             setShowAddForm(false)
+            showMessage(`נקודת ההיסטוריה מ-${dateFormatter.format(new Date(data.date))} נוספה בהצלחה`)
           }}
           onCancel={() => setShowAddForm(false)}
         />
@@ -58,9 +66,16 @@ export default function History() {
         onSaveEdit={(id, data) => {
           updateHistoryPoint(id, data)
           setEditingId(null)
+          showMessage(`נקודת ההיסטוריה מ-${dateFormatter.format(new Date(data.date))} עודכנה`)
         }}
         onCancelEdit={() => setEditingId(null)}
-        onDelete={(id) => deleteHistoryPoint(id)}
+        onDelete={(id) => {
+          const point = points.find((p) => p.id === id)
+          deleteHistoryPoint(id)
+          showMessage(
+            point ? `נקודת ההיסטוריה מ-${dateFormatter.format(new Date(point.date))} נמחקה` : 'נקודת ההיסטוריה נמחקה',
+          )
+        }}
       />
     </div>
   )

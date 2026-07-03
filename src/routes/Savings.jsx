@@ -4,7 +4,9 @@ import { useFinanceStore, selectTotalMonthlySavings } from '../store/useFinanceS
 import SavingsComponentForm from '../components/savings/SavingsComponentForm'
 import SavingsComponentList from '../components/savings/SavingsComponentList'
 import SavingsCategorySummary from '../components/savings/SavingsCategorySummary'
+import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
+import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Savings() {
   const components = useFinanceStore((s) => s.savingsComponents)
@@ -15,6 +17,7 @@ export default function Savings() {
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [message, showMessage] = useTransientMessage()
 
   return (
     <div className="space-y-6">
@@ -43,12 +46,15 @@ export default function Savings() {
         )}
       </div>
 
+      <SuccessMessage message={message} />
+
       {showAddForm && (
         <SavingsComponentForm
           submitLabel="הוסף רכיב"
           onSubmit={(data) => {
             addSavingsComponent(data)
             setShowAddForm(false)
+            showMessage(`הרכיב "${data.name}" נוסף בהצלחה`)
           }}
           onCancel={() => setShowAddForm(false)}
         />
@@ -66,9 +72,14 @@ export default function Savings() {
         onSaveEdit={(id, data) => {
           updateSavingsComponent(id, data)
           setEditingId(null)
+          showMessage(`השינויים ב"${data.name}" נשמרו`)
         }}
         onCancelEdit={() => setEditingId(null)}
-        onDelete={(id) => deleteSavingsComponent(id)}
+        onDelete={(id) => {
+          const component = components.find((c) => c.id === id)
+          deleteSavingsComponent(id)
+          showMessage(component ? `הרכיב "${component.name}" נמחק` : 'הרכיב נמחק')
+        }}
       />
     </div>
   )

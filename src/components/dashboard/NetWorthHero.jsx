@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, TriangleAlert } from 'lucide-react'
 import {
   useFinanceStore,
   selectNetWorth,
@@ -12,9 +12,14 @@ import { formatRelativeDate } from '../../utils/formatDate'
 import { useCountUp } from '../../utils/useCountUp'
 
 const dateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' })
+const STALE_AFTER_DAYS = 30
 
 function formatSince(dateStr) {
   return dateFormatter.format(new Date(dateStr))
+}
+
+function daysSince(isoString) {
+  return Math.floor((Date.now() - new Date(isoString).getTime()) / 86_400_000)
 }
 
 export default function NetWorthHero() {
@@ -29,6 +34,8 @@ export default function NetWorthHero() {
   const animated = useCountUp(netWorth)
 
   const isPositiveTrend = trend && trend.delta >= 0
+  const staleDays = lastUpdatedAt ? daysSince(lastUpdatedAt) : null
+  const isStale = staleDays !== null && staleDays >= STALE_AFTER_DAYS
 
   return (
     <motion.div
@@ -70,6 +77,13 @@ export default function NetWorthHero() {
         מבוסס על {assetsCount} נכסים ו־{liabilitiesCount} התחייבויות
         {lastUpdatedAt && <> · עודכן לאחרונה {formatRelativeDate(lastUpdatedAt)}</>}
       </p>
+
+      {isStale && (
+        <div className="mx-auto mt-4 flex max-w-md items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <TriangleAlert className="size-3.5 shrink-0" />
+          עברו {staleDays} ימים מאז העדכון האחרון — כדאי לבדוק אם משהו השתנה
+        </div>
+      )}
     </motion.div>
   )
 }
