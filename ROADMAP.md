@@ -15,7 +15,7 @@
 
 ---
 
-## מצב נוכחי (V1 + V1.2 + V1.3 — הושלם ופרוס)
+## מצב נוכחי (V1 + V1.2 + V1.3 + V1.3.1 + V1 סגירה — הושלם ופרוס)
 
 **V1**: מסכי נכסים/התחייבויות (CRUD מלא), מסך חיסכון חודשי (`/savings`), Dashboard עם שווי נקי/KPI/דונאטים/מד נכסים-התחייבויות, גיבוי/שחזור JSON, Dark Mode, GitHub Pages + תיקון ניתוב SPA.
 
@@ -45,7 +45,18 @@
 - **באג נוסף שנמצא ותוקן**: `formatCompactCurrency` (המשמש בציר ה-Y של הגרף) בנה מחרוזות ידנית (`` `₪${n}K` ``) בלי טיפול ב-bidi — עם שווי נקי שלילי זה גרם לתצוגה הפוכה/מבולבלת בעברית (למשל "460K-₪" במקום "-₪460K"). תוקן ע"י שימוש ב-`Intl.NumberFormat` עם `notation: 'compact'` (כמו ב-`formatCurrency` הרגיל), שמטפל נכון בכיווניות.
 - **אומת**: `historyPoints` נשארים Snapshot קפוא לחלוטין — נבדק שעריכת נכס/התחייבות נוכחיים לא משנה נקודות היסטוריה קיימות. כל מסכי ה-CRUD, הדשבורד, וה-History משתמשים באותם selectors מהסטור (`selectTotalAssets`, `selectTotalMonthlyIncome` וכו') ללא חישוב כפול במקום אחר. `netWorthHistory` (המעקב האוטומטי היומי ב-`NetWorthHero`) נשאר מנגנון נפרד ומתויג בבירור ("מאז X") — זו הכרעת עיצוב מודעת: הוא מציג "מגמה מאז הביקור האחרון" גם למשתמשים שלא מזינים נקודות היסטוריה ידניות בכלל, ולכן לא אוחד עם `historyPoints`.
 
-**מודל הנתונים הנוכחי** (`useFinanceStore`): `assets[]`, `liabilities[]`, `savingsComponents[]`, `incomeSources[]` (כולם עם `updatedAt` לכל רשומה) + `historyPoints[]` (נקודות ידניות: `date, totalAssets, totalLiabilities, note`) + `netWorthHistory[]` (רישום יומי אוטומטי קליל למגמת ה-Hero, לא Snapshot רשמי) + `activityLog[]` (יומן פעילות אוטומטי: `entityType, action, summary, timestamp`, מבוסס `BACKUP_DATA_KEYS`).
+**סבב סגירת V1** — ליטוש אחרון לפני שעוצרים ומתכננים V2 בנפרד, ללא פיצ'רים מעבר לרשימה הבאה:
+- **שיפור בחירת תאריך בהיסטוריה**: `DateField` חדש (חלופה ל-`<input type="date">` הפשוט) — בורר שנה (`<select>`), כפתורי דילוג שנה קדימה/אחורה, לצד שדה התאריך המקורי שעדיין תומך בהקלדה ידנית. פותר את הצורך ללחוץ עשרות פעמים כדי להגיע לתאריך מלפני כמה שנים.
+- **קטגוריות דינמיות** בכל המסכים (נכסים/התחייבויות/הכנסות/חיסכון): הקטגוריות הקבועות הפכו לברירת מחדל בלבד (`categories: {assets, liabilities, income, savings}` בסטור, נטענות מ-`DEFAULT_*_CATEGORIES` ב-`utils/categories.js` בטעינה ראשונה). קומפוננטת `CategoryManager` משותפת בכל 4 המסכים מאפשרת הוספה, שינוי שם, הסתרה והצגה, ומחיקה (חסומה אם יש פריטים בקטגוריה — כדי לא להשאיר פריטים עם קטגוריה לא קיימת; אפשר להסתיר במקום). קטגוריה חדשה מקבלת את הגוון המשותף "אחר" (עומד בכלל "8 גוונים קבועים, השאר משותף" שכבר היה מתועד בקוד). קומפוננטת `CategorySummary` אחת מחליפה 4 קבצים זהים (`AssetCategorySummary`/`LiabilityCategorySummary`/`IncomeCategorySummary`/`SavingsCategorySummary` נמחקו).
+- **הפרדת הכנסות עבודה/נכסים**: שדה `incomeType` (`work`/`assets`) לכל מקור הכנסה, ברירת מחדל `work` (גם עבור רשומות ישנות בלי השדה - נקרא דיפנסיבית `item.incomeType || 'work'`, בלי צורך ב-migrate). דשבורד מציג מד "עבודה מול נכסים בהכנסה" (`IncomeBreakdownMeter`) עם הסכומים ואחוז ההכנסה מנכסים.
+- **השלמת מודל התחייבויות**: שדות `monthlyPayment`, `principalPortion`, `interestPortion` (הזנה ידנית, ללא חישוב אוטומטי ביניהם). מוצג בכרטיס ההתחייבות.
+- **קישור התחייבויות לחיסכון**: `selectTotalMonthlySavings` = סך רכיבי החיסכון הידניים + סך `principalPortion` מכל ההתחייבויות (`selectTotalLoanPrincipalPaydown`) — נקודת אמת אחת ל"חיסכון חודשי" בכל האפליקציה (Dashboard ו-`/savings` כאחד). מסך החיסכון מציג שורה נפרדת וברורה "ירידת קרן מהלוואות - מחושב אוטומטית" עם קישור למסך ההתחייבויות, כדי שלא יוזן פעמיים.
+- **QA מלא + ניקוי קוד**: נמצאו ותוקנו שני באגי truncate (חיתוך טקסט) שהיו קיימים מסבבים קודמים - כרטיס נקודת היסטוריה (`HistoryPointCard`) וכרטיס התחייבות חדש עם פירוט תשלום (`LiabilityCard`), שניהם חתכו מידע פיננסי אמיתי במובייל. הוסר קוד מת: `getCategoryLabel` (לא היה בשימוש), `MUTED_COLOR`/`DEFAULT_*_CATEGORIES` נשארו מיוצאים רק כי הסטור צורך אותם (לא consumers אחרים). כל הקטגוריות/כרטיסים/רשימות עברו לצרוך את הקטגוריות דרך הסטור בלבד, לא ייבוא סטטי.
+- **אומת**: מיגרציה בטוחה מנתונים בפורמט הישן (בלי `categories`, בלי שדות ההתחייבות החדשים, בלי `incomeType`) — כל השדות תוספים בלבד, נטען ללא שגיאות וללא אובדן נתונים. גיבוי/שחזור JSON כולל את `categories` (נוסף ל-`BACKUP_DATA_KEYS`).
+
+**מודל הנתונים הנוכחי** (`useFinanceStore`): `assets[]`, `liabilities[]` (עם `monthlyPayment`, `principalPortion`, `interestPortion`), `savingsComponents[]`, `incomeSources[]` (עם `incomeType`) — כולם עם `updatedAt` לכל רשומה — + `historyPoints[]` (נקודות ידניות: `date, totalAssets, totalLiabilities, note`) + `netWorthHistory[]` (רישום יומי אוטומטי קליל למגמת ה-Hero, לא Snapshot רשמי) + `activityLog[]` (יומן פעילות אוטומטי) + `categories{assets, liabilities, income, savings}` (רשימות קטגוריות ניתנות לעריכה, `{id, label, color, hidden}`).
+
+**V1 סגור.** לא מתוכננים פיצ'רים נוספים ל-V1 — הצעד הבא הוא איפיון מסודר של V2 לפני כתיבת קוד.
 
 ---
 

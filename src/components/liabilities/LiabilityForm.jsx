@@ -1,11 +1,23 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
-import { LIABILITY_CATEGORIES } from '../../utils/categories'
 
-const EMPTY = { name: '', category: LIABILITY_CATEGORIES[0].id, value: '', notes: '' }
+const EMPTY = {
+  name: '',
+  category: '',
+  value: '',
+  monthlyPayment: '',
+  principalPortion: '',
+  interestPortion: '',
+  notes: '',
+}
 
-export default function LiabilityForm({ initialValues, onSubmit, onCancel, submitLabel }) {
-  const [values, setValues] = useState(() => ({ ...EMPTY, ...initialValues }))
+export default function LiabilityForm({ categories, initialValues, onSubmit, onCancel, submitLabel }) {
+  const defaultCategory = categories.find((c) => !c.hidden)?.id ?? categories[0]?.id ?? ''
+  const [values, setValues] = useState(() => ({
+    ...EMPTY,
+    category: defaultCategory,
+    ...initialValues,
+  }))
   const [error, setError] = useState('')
 
   function handleChange(field, val) {
@@ -26,6 +38,9 @@ export default function LiabilityForm({ initialValues, onSubmit, onCancel, submi
       name: values.name.trim(),
       category: values.category,
       value: Number(values.value),
+      monthlyPayment: Number(values.monthlyPayment) || 0,
+      principalPortion: Number(values.principalPortion) || 0,
+      interestPortion: Number(values.interestPortion) || 0,
       notes: values.notes.trim(),
     })
   }
@@ -58,11 +73,13 @@ export default function LiabilityForm({ initialValues, onSubmit, onCancel, submi
           onChange={(e) => handleChange('category', e.target.value)}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
         >
-          {LIABILITY_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
+          {categories
+            .filter((c) => !c.hidden || c.id === values.category)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
         </select>
       </div>
 
@@ -81,6 +98,48 @@ export default function LiabilityForm({ initialValues, onSubmit, onCancel, submi
       </div>
 
       <div className="sm:col-span-1">
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          החזר חודשי (₪)
+        </label>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={values.monthlyPayment}
+          onChange={(e) => handleChange('monthlyPayment', e.target.value)}
+          placeholder="0"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+        />
+      </div>
+
+      <div className="sm:col-span-1">
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          מתוך ההחזר - קרן (₪)
+        </label>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={values.principalPortion}
+          onChange={(e) => handleChange('principalPortion', e.target.value)}
+          placeholder="0"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+        />
+      </div>
+
+      <div className="sm:col-span-1">
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          מתוך ההחזר - ריבית (₪)
+        </label>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={values.interestPortion}
+          onChange={(e) => handleChange('interestPortion', e.target.value)}
+          placeholder="0"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+        />
+      </div>
+
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
           הערות (לא חובה)
         </label>

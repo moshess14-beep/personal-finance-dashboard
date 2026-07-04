@@ -1,11 +1,12 @@
 import LiabilityCard from './LiabilityCard'
 import LiabilityForm from './LiabilityForm'
-import { LIABILITY_CATEGORIES, getCategoryColor } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { useThemeStore } from '../../store/useThemeStore'
 
 export default function LiabilityList({
   liabilities,
+  categories,
   editingId,
   onStartEdit,
   onSaveEdit,
@@ -15,7 +16,7 @@ export default function LiabilityList({
   const isDark = useThemeStore((s) => s.isDark)
   const mode = isDark ? 'dark' : 'light'
 
-  const groups = LIABILITY_CATEGORIES.map((cat) => ({
+  const groups = categories.map((cat) => ({
     ...cat,
     items: liabilities.filter((l) => l.category === cat.id),
   })).filter((g) => g.items.length > 0)
@@ -39,7 +40,7 @@ export default function LiabilityList({
             <div className="mb-2 flex items-center gap-2">
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getCategoryColor(LIABILITY_CATEGORIES, group.id, mode) }}
+                style={{ backgroundColor: getCategoryColor(categories, group.id, mode) }}
                 aria-hidden="true"
               />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -57,6 +58,7 @@ export default function LiabilityList({
                 editingId === liability.id ? (
                   <LiabilityForm
                     key={liability.id}
+                    categories={categories}
                     initialValues={liability}
                     submitLabel="שמור שינויים"
                     onSubmit={(data) => onSaveEdit(liability.id, data)}
@@ -66,6 +68,7 @@ export default function LiabilityList({
                   <LiabilityCard
                     key={liability.id}
                     liability={liability}
+                    categories={categories}
                     onEdit={() => onStartEdit(liability.id)}
                     onDelete={() => onDelete(liability.id)}
                   />

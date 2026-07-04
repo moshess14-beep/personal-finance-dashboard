@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatRelativeDate } from '../../utils/formatDate'
-import { getCategoryColor, SAVINGS_CATEGORIES } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { useThemeStore } from '../../store/useThemeStore'
 
-export default function SavingsComponentCard({ component, onEdit, onDelete }) {
+export default function SavingsComponentCard({ component, categories, onEdit, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isDark = useThemeStore((s) => s.isDark)
-  const color = getCategoryColor(SAVINGS_CATEGORIES, component.category, isDark ? 'dark' : 'light')
+  const color = getCategoryColor(categories, component.category, isDark ? 'dark' : 'light')
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">

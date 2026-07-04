@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
-import { SAVINGS_CATEGORIES } from '../../utils/categories'
 
-const EMPTY = { name: '', category: SAVINGS_CATEGORIES[0].id, amount: '', note: '' }
+const EMPTY = { name: '', category: '', amount: '', note: '' }
 
-export default function SavingsComponentForm({ initialValues, onSubmit, onCancel, submitLabel }) {
-  const [values, setValues] = useState(() => ({ ...EMPTY, ...initialValues }))
+export default function SavingsComponentForm({ categories, initialValues, onSubmit, onCancel, submitLabel }) {
+  const defaultCategory = categories.find((c) => !c.hidden)?.id ?? categories[0]?.id ?? ''
+  const [values, setValues] = useState(() => ({
+    ...EMPTY,
+    category: defaultCategory,
+    ...initialValues,
+  }))
   const [error, setError] = useState('')
 
   function handleChange(field, val) {
@@ -58,11 +62,13 @@ export default function SavingsComponentForm({ initialValues, onSubmit, onCancel
           onChange={(e) => handleChange('category', e.target.value)}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
         >
-          {SAVINGS_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
+          {categories
+            .filter((c) => !c.hidden || c.id === values.category)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
         </select>
       </div>
 

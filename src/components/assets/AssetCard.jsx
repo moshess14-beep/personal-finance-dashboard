@@ -3,13 +3,12 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatRelativeDate } from '../../utils/formatDate'
 import { getCategoryColor } from '../../utils/categories'
-import { ASSET_CATEGORIES } from '../../utils/categories'
 import { useThemeStore } from '../../store/useThemeStore'
 
-export default function AssetCard({ asset, onEdit, onDelete }) {
+export default function AssetCard({ asset, categories, onEdit, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isDark = useThemeStore((s) => s.isDark)
-  const color = getCategoryColor(ASSET_CATEGORIES, asset.category, isDark ? 'dark' : 'light')
+  const color = getCategoryColor(categories, asset.category, isDark ? 'dark' : 'light')
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">

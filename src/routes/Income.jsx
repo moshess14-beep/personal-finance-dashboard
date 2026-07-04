@@ -3,13 +3,15 @@ import { Plus } from 'lucide-react'
 import { useFinanceStore, selectTotalMonthlyIncome } from '../store/useFinanceStore'
 import IncomeSourceForm from '../components/income/IncomeSourceForm'
 import IncomeSourceList from '../components/income/IncomeSourceList'
-import IncomeCategorySummary from '../components/income/IncomeCategorySummary'
+import CategorySummary from '../components/common/CategorySummary'
+import CategoryManager from '../components/common/CategoryManager'
 import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Income() {
   const sources = useFinanceStore((s) => s.incomeSources)
+  const categories = useFinanceStore((s) => s.categories.income)
   const total = useFinanceStore(selectTotalMonthlyIncome)
   const addIncomeSource = useFinanceStore((s) => s.addIncomeSource)
   const updateIncomeSource = useFinanceStore((s) => s.updateIncomeSource)
@@ -47,6 +49,7 @@ export default function Income() {
 
       {showAddForm && (
         <IncomeSourceForm
+          categories={categories}
           submitLabel="הוסף מקור הכנסה"
           onSubmit={(data) => {
             addIncomeSource(data)
@@ -57,10 +60,13 @@ export default function Income() {
         />
       )}
 
-      <IncomeCategorySummary sources={sources} />
+      <CategoryManager domain="income" items={sources} />
+
+      <CategorySummary items={sources} categories={categories} valueKey="amount" />
 
       <IncomeSourceList
         sources={sources}
+        categories={categories}
         editingId={editingId}
         onStartEdit={(id) => {
           setShowAddForm(false)

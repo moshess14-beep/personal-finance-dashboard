@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
+import DateField from '../common/DateField'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const EMPTY = { date: today(), totalAssets: '', totalLiabilities: '', note: '' }
@@ -42,17 +43,11 @@ export default function HistoryPointForm({ initialValues, onSubmit, onCancel, su
       onSubmit={handleSubmit}
       className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2"
     >
-      <div className="sm:col-span-1">
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
           תאריך
         </label>
-        <input
-          autoFocus
-          type="date"
-          value={values.date}
-          onChange={(e) => handleChange('date', e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
-        />
+        <DateField value={values.date} onChange={(v) => handleChange('date', v)} />
       </div>
 
       <div className="sm:col-span-1">

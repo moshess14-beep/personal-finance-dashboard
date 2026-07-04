@@ -1,13 +1,29 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { formatCurrency } from '../utils/formatCurrency'
+import {
+  DEFAULT_ASSET_CATEGORIES,
+  DEFAULT_LIABILITY_CATEGORIES,
+  DEFAULT_SAVINGS_CATEGORIES,
+  DEFAULT_INCOME_CATEGORIES,
+  MUTED_COLOR,
+} from '../utils/categories'
 
 const now = () => new Date().toISOString()
 
+const DEFAULT_CATEGORIES = {
+  assets: DEFAULT_ASSET_CATEGORIES,
+  liabilities: DEFAULT_LIABILITY_CATEGORIES,
+  income: DEFAULT_INCOME_CATEGORIES,
+  savings: DEFAULT_SAVINGS_CATEGORIES,
+}
+
 // Single source of truth for which store keys are actual user data (as
-// opposed to actions/functions). Backup export and replaceAll both derive
-// from this list, so adding a new persisted array only means adding it here
-// once - not also remembering to touch the export code separately.
+// opposed to actions/functions). Backup export derives from this list, so
+// adding a new persisted field only means adding it here once - not also
+// remembering to touch the export code separately. replaceAll (backup
+// import) still needs its own fallback line per key below, since a few
+// keys need non-empty-array defaults for old backups that predate them.
 export const BACKUP_DATA_KEYS = [
   'assets',
   'liabilities',
@@ -16,6 +32,7 @@ export const BACKUP_DATA_KEYS = [
   'historyPoints',
   'netWorthHistory',
   'activityLog',
+  'categories',
 ]
 
 function activityEntry(entityType, action, summary) {
@@ -49,6 +66,46 @@ export const useFinanceStore = create(
       historyPoints: [],
       netWorthHistory: [],
       activityLog: [],
+      categories: DEFAULT_CATEGORIES,
+
+      // New user-created categories always get the shared muted color -
+      // the palette reserves a fixed set of distinct hues for the built-in
+      // categories (see utils/categories.js), so overflow categories share
+      // one muted tone rather than diluting the palette.
+      addCategory: (domain, label) =>
+        set((s) => ({
+          categories: {
+            ...s.categories,
+            [domain]: [
+              ...s.categories[domain],
+              { id: crypto.randomUUID(), label: label.trim(), color: MUTED_COLOR, hidden: false },
+            ],
+          },
+        })),
+      renameCategory: (domain, id, label) =>
+        set((s) => ({
+          categories: {
+            ...s.categories,
+            [domain]: s.categories[domain].map((c) => (c.id === id ? { ...c, label: label.trim() } : c)),
+          },
+        })),
+      toggleCategoryHidden: (domain, id) =>
+        set((s) => ({
+          categories: {
+            ...s.categories,
+            [domain]: s.categories[domain].map((c) => (c.id === id ? { ...c, hidden: !c.hidden } : c)),
+          },
+        })),
+      // Deleting a category that's still in use on real items would strand
+      // them with an unknown category id - callers must check usage first
+      // (and offer "hide" instead). This only guards the last-one-standing
+      // case, so there's always at least one category to assign to.
+      deleteCategory: (domain, id) =>
+        set((s) => {
+          const list = s.categories[domain]
+          if (list.length <= 1) return s
+          return { categories: { ...s.categories, [domain]: list.filter((c) => c.id !== id) } }
+        }),
 
       addAsset: (asset) =>
         set((s) => {
@@ -88,7 +145,15 @@ export const useFinanceStore = create(
 
       addLiability: (liability) =>
         set((s) => {
-          const item = { id: crypto.randomUUID(), notes: '', updatedAt: now(), ...liability }
+          const item = {
+            id: crypto.randomUUID(),
+            notes: '',
+            monthlyPayment: 0,
+            principalPortion: 0,
+            interestPortion: 0,
+            updatedAt: now(),
+            ...liability,
+          }
           return {
             liabilities: [...s.liabilities, item],
             activityLog: [
@@ -144,7 +209,7 @@ export const useFinanceStore = create(
 
       addIncomeSource: (source) =>
         set((s) => {
-          const item = { id: crypto.randomUUID(), note: '', updatedAt: now(), ...source }
+          const item = { id: crypto.randomUUID(), note: '', incomeType: 'work', updatedAt: now(), ...source }
           return {
             incomeSources: [...s.incomeSources, item],
             activityLog: [
@@ -226,6 +291,7 @@ export const useFinanceStore = create(
           historyPoints: data.historyPoints ?? [],
           netWorthHistory: data.netWorthHistory ?? [],
           activityLog: data.activityLog ?? [],
+          categories: data.categories ?? DEFAULT_CATEGORIES,
         }),
     }),
     {
@@ -245,11 +311,38 @@ export const useFinanceStore = create(
 export const selectTotalAssets = (s) =>
   s.assets.reduce((sum, a) => sum + Number(a.value || 0), 0)
 
-export const selectTotalMonthlySavings = (s) =>
+// Manually-entered savings components only - not exported, since nothing
+// outside this file needs just the manual portion; selectTotalMonthlySavings
+// below is the one everything else should read.
+const selectManualMonthlySavings = (s) =>
   s.savingsComponents.reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+// Paying down loan principal *is* saving (it grows net worth the same way
+// a deposit does) - summed straight from liabilities so the user never has
+// to enter the same number in two places. This is the one place that
+// number is computed; everything that shows "monthly savings" reads it
+// through selectTotalMonthlySavings below.
+export const selectTotalLoanPrincipalPaydown = (s) =>
+  s.liabilities.reduce((sum, l) => sum + Number(l.principalPortion || 0), 0)
+
+export const selectTotalMonthlySavings = (s) =>
+  selectManualMonthlySavings(s) + selectTotalLoanPrincipalPaydown(s)
 
 export const selectTotalMonthlyIncome = (s) =>
   s.incomeSources.reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+// incomeType is optional on older entries (added after incomeSources
+// already existed) - treated as 'work' when absent rather than requiring a
+// migration, consistent with how other optional per-item fields are read.
+export const selectWorkIncome = (s) =>
+  s.incomeSources
+    .filter((c) => (c.incomeType || 'work') === 'work')
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+export const selectAssetIncome = (s) =>
+  s.incomeSources
+    .filter((c) => c.incomeType === 'assets')
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0)
 
 // Most recent updatedAt across all live financial data (not history points,
 // which are deliberate past checkpoints rather than "current" records).

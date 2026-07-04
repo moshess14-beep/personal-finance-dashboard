@@ -1,11 +1,12 @@
 import IncomeSourceCard from './IncomeSourceCard'
 import IncomeSourceForm from './IncomeSourceForm'
-import { INCOME_CATEGORIES, getCategoryColor } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { useThemeStore } from '../../store/useThemeStore'
 
 export default function IncomeSourceList({
   sources,
+  categories,
   editingId,
   onStartEdit,
   onSaveEdit,
@@ -15,7 +16,7 @@ export default function IncomeSourceList({
   const isDark = useThemeStore((s) => s.isDark)
   const mode = isDark ? 'dark' : 'light'
 
-  const groups = INCOME_CATEGORIES.map((cat) => ({
+  const groups = categories.map((cat) => ({
     ...cat,
     items: sources.filter((s) => s.category === cat.id),
   })).filter((g) => g.items.length > 0)
@@ -39,7 +40,7 @@ export default function IncomeSourceList({
             <div className="mb-2 flex items-center gap-2">
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getCategoryColor(INCOME_CATEGORIES, group.id, mode) }}
+                style={{ backgroundColor: getCategoryColor(categories, group.id, mode) }}
                 aria-hidden="true"
               />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -57,6 +58,7 @@ export default function IncomeSourceList({
                 editingId === source.id ? (
                   <IncomeSourceForm
                     key={source.id}
+                    categories={categories}
                     initialValues={source}
                     submitLabel="שמור שינויים"
                     onSubmit={(data) => onSaveEdit(source.id, data)}
@@ -66,6 +68,7 @@ export default function IncomeSourceList({
                   <IncomeSourceCard
                     key={source.id}
                     source={source}
+                    categories={categories}
                     onEdit={() => onStartEdit(source.id)}
                     onDelete={() => onDelete(source.id)}
                   />

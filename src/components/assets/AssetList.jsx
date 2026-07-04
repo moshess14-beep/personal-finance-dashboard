@@ -1,14 +1,22 @@
 import AssetCard from './AssetCard'
 import AssetForm from './AssetForm'
-import { ASSET_CATEGORIES, getCategoryColor } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { useThemeStore } from '../../store/useThemeStore'
 
-export default function AssetList({ assets, editingId, onStartEdit, onSaveEdit, onCancelEdit, onDelete }) {
+export default function AssetList({
+  assets,
+  categories,
+  editingId,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDelete,
+}) {
   const isDark = useThemeStore((s) => s.isDark)
   const mode = isDark ? 'dark' : 'light'
 
-  const groups = ASSET_CATEGORIES.map((cat) => ({
+  const groups = categories.map((cat) => ({
     ...cat,
     items: assets.filter((a) => a.category === cat.id),
   })).filter((g) => g.items.length > 0)
@@ -32,7 +40,7 @@ export default function AssetList({ assets, editingId, onStartEdit, onSaveEdit, 
             <div className="mb-2 flex items-center gap-2">
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getCategoryColor(ASSET_CATEGORIES, group.id, mode) }}
+                style={{ backgroundColor: getCategoryColor(categories, group.id, mode) }}
                 aria-hidden="true"
               />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -50,6 +58,7 @@ export default function AssetList({ assets, editingId, onStartEdit, onSaveEdit, 
                 editingId === asset.id ? (
                   <AssetForm
                     key={asset.id}
+                    categories={categories}
                     initialValues={asset}
                     submitLabel="שמור שינויים"
                     onSubmit={(data) => onSaveEdit(asset.id, data)}
@@ -59,6 +68,7 @@ export default function AssetList({ assets, editingId, onStartEdit, onSaveEdit, 
                   <AssetCard
                     key={asset.id}
                     asset={asset}
+                    categories={categories}
                     onEdit={() => onStartEdit(asset.id)}
                     onDelete={() => onDelete(asset.id)}
                   />
