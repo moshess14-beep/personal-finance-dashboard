@@ -10,7 +10,7 @@ import {
   selectTotalMonthlyIncome,
   selectWorkIncome,
   selectAssetIncome,
-  selectMonthlyNetWorthGrowth,
+  selectNetWorthGrowthSinceLastPoint,
   selectNetWorth,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
@@ -39,7 +39,7 @@ export default function Dashboard() {
   const totalMonthlyIncome = useFinanceStore(selectTotalMonthlyIncome)
   const workIncome = useFinanceStore(selectWorkIncome)
   const assetIncome = useFinanceStore(selectAssetIncome)
-  const monthlyGrowth = useFinanceStore(useShallow(selectMonthlyNetWorthGrowth))
+  const growthSincePoint = useFinanceStore(useShallow(selectNetWorthGrowthSinceLastPoint))
   const netWorth = useFinanceStore(selectNetWorth)
   const recordNetWorthSnapshot = useFinanceStore((s) => s.recordNetWorthSnapshot)
 
@@ -117,15 +117,19 @@ export default function Dashboard() {
         />
         <StatCard
           icon={TrendingUp}
-          label="גידול חודשי בהון"
-          value={monthlyGrowth ? formatCurrency(monthlyGrowth.amount) : 'אין מספיק נתונים'}
+          label="גידול מאז נקודת ההיסטוריה האחרונה"
+          value={
+            growthSincePoint
+              ? `${growthSincePoint.delta >= 0 ? '+' : ''}${formatCurrency(growthSincePoint.delta)}`
+              : 'אין עדיין נקודת השוואה'
+          }
           valueClassName={
-            monthlyGrowth ? (monthlyGrowth.amount >= 0 ? 'text-gain' : 'text-loss') : undefined
+            growthSincePoint ? (growthSincePoint.delta >= 0 ? 'text-gain' : 'text-loss') : undefined
           }
           subLabel={
-            monthlyGrowth
-              ? `${monthlyGrowth.amount >= 0 ? '+' : ''}${monthlyGrowth.percent.toFixed(1)}% בחודש, לעומת ${sinceDateFormatter.format(new Date(monthlyGrowth.sinceDate))}`
-              : 'נדרשת נקודת היסטוריה בת 14+ יום'
+            growthSincePoint
+              ? `${growthSincePoint.delta >= 0 ? '+' : ''}${growthSincePoint.percent.toFixed(1)}% מאז ${sinceDateFormatter.format(new Date(growthSincePoint.sinceDate))}`
+              : 'הוסף נקודת היסטוריה כדי לראות גידול'
           }
           delay={0.22}
           to="/history"
