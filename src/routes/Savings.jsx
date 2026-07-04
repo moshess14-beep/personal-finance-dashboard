@@ -1,16 +1,24 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { useFinanceStore, selectTotalMonthlySavings } from '../store/useFinanceStore'
+import { Plus, Landmark } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  useFinanceStore,
+  selectTotalMonthlySavings,
+  selectTotalLoanPrincipalPaydown,
+} from '../store/useFinanceStore'
 import SavingsComponentForm from '../components/savings/SavingsComponentForm'
 import SavingsComponentList from '../components/savings/SavingsComponentList'
-import SavingsCategorySummary from '../components/savings/SavingsCategorySummary'
+import CategorySummary from '../components/common/CategorySummary'
+import CategoryManager from '../components/common/CategoryManager'
 import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Savings() {
   const components = useFinanceStore((s) => s.savingsComponents)
+  const categories = useFinanceStore((s) => s.categories.savings)
   const total = useFinanceStore(selectTotalMonthlySavings)
+  const loanPrincipal = useFinanceStore(selectTotalLoanPrincipalPaydown)
   const addSavingsComponent = useFinanceStore((s) => s.addSavingsComponent)
   const updateSavingsComponent = useFinanceStore((s) => s.updateSavingsComponent)
   const deleteSavingsComponent = useFinanceStore((s) => s.deleteSavingsComponent)
@@ -48,8 +56,26 @@ export default function Savings() {
 
       <SuccessMessage message={message} />
 
+      {loanPrincipal > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800/40">
+          <Landmark className="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
+          <p className="text-slate-600 dark:text-slate-300">
+            מתוך הסכום למעלה,{' '}
+            <span className="font-semibold tabular-nums text-slate-900 dark:text-white">
+              {formatCurrency(loanPrincipal)}
+            </span>{' '}
+            הם ירידת קרן מהלוואות - מחושבים אוטומטית מתוך{' '}
+            <Link to="/liabilities" className="text-brand-600 hover:underline dark:text-brand-400">
+              מסך ההתחייבויות
+            </Link>
+            , כדי שלא תצטרך להזין אותם פעם נוספת כאן.
+          </p>
+        </div>
+      )}
+
       {showAddForm && (
         <SavingsComponentForm
+          categories={categories}
           submitLabel="הוסף רכיב"
           onSubmit={(data) => {
             addSavingsComponent(data)
@@ -60,10 +86,13 @@ export default function Savings() {
         />
       )}
 
-      <SavingsCategorySummary components={components} />
+      <CategoryManager domain="savings" items={components} />
+
+      <CategorySummary items={components} categories={categories} valueKey="amount" />
 
       <SavingsComponentList
         components={components}
+        categories={categories}
         editingId={editingId}
         onStartEdit={(id) => {
           setShowAddForm(false)

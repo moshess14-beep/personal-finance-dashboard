@@ -1,11 +1,12 @@
 import SavingsComponentCard from './SavingsComponentCard'
 import SavingsComponentForm from './SavingsComponentForm'
-import { SAVINGS_CATEGORIES, getCategoryColor } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { useThemeStore } from '../../store/useThemeStore'
 
 export default function SavingsComponentList({
   components,
+  categories,
   editingId,
   onStartEdit,
   onSaveEdit,
@@ -15,7 +16,7 @@ export default function SavingsComponentList({
   const isDark = useThemeStore((s) => s.isDark)
   const mode = isDark ? 'dark' : 'light'
 
-  const groups = SAVINGS_CATEGORIES.map((cat) => ({
+  const groups = categories.map((cat) => ({
     ...cat,
     items: components.filter((c) => c.category === cat.id),
   })).filter((g) => g.items.length > 0)
@@ -39,7 +40,7 @@ export default function SavingsComponentList({
             <div className="mb-2 flex items-center gap-2">
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getCategoryColor(SAVINGS_CATEGORIES, group.id, mode) }}
+                style={{ backgroundColor: getCategoryColor(categories, group.id, mode) }}
                 aria-hidden="true"
               />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -57,6 +58,7 @@ export default function SavingsComponentList({
                 editingId === component.id ? (
                   <SavingsComponentForm
                     key={component.id}
+                    categories={categories}
                     initialValues={component}
                     submitLabel="שמור שינויים"
                     onSubmit={(data) => onSaveEdit(component.id, data)}
@@ -66,6 +68,7 @@ export default function SavingsComponentList({
                   <SavingsComponentCard
                     key={component.id}
                     component={component}
+                    categories={categories}
                     onEdit={() => onStartEdit(component.id)}
                     onDelete={() => onDelete(component.id)}
                   />

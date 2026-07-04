@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatRelativeDate } from '../../utils/formatDate'
-import { getCategoryColor, LIABILITY_CATEGORIES } from '../../utils/categories'
+import { getCategoryColor } from '../../utils/categories'
 import { useThemeStore } from '../../store/useThemeStore'
 
-export default function LiabilityCard({ liability, onEdit, onDelete }) {
+export default function LiabilityCard({ liability, categories, onEdit, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isDark = useThemeStore((s) => s.isDark)
-  const color = getCategoryColor(LIABILITY_CATEGORIES, liability.category, isDark ? 'dark' : 'light')
+  const color = getCategoryColor(categories, liability.category, isDark ? 'dark' : 'light')
+  const hasPaymentInfo = Number(liability.monthlyPayment || 0) > 0
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
@@ -21,6 +22,14 @@ export default function LiabilityCard({ liability, onEdit, onDelete }) {
         <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
           {liability.name}
         </p>
+        {hasPaymentInfo && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            החזר חודשי {formatCurrency(liability.monthlyPayment)}
+            {' · '}
+            קרן {formatCurrency(liability.principalPortion)} · ריבית{' '}
+            {formatCurrency(liability.interestPortion)}
+          </p>
+        )}
         {liability.notes && (
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">{liability.notes}</p>
         )}

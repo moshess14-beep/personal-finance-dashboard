@@ -1,11 +1,10 @@
-import { ASSET_CATEGORIES } from '../../utils/categories'
 import { summarizeByCategory } from '../../utils/aggregations'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { useThemeStore } from '../../store/useThemeStore'
 
-export default function AssetCategorySummary({ assets }) {
+export default function CategorySummary({ items, categories, valueKey = 'value' }) {
   const isDark = useThemeStore((s) => s.isDark)
-  const rows = summarizeByCategory(assets, ASSET_CATEGORIES, isDark ? 'dark' : 'light')
+  const rows = summarizeByCategory(items, categories, isDark ? 'dark' : 'light', valueKey)
 
   if (rows.length === 0) return null
 

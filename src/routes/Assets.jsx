@@ -3,13 +3,15 @@ import { Plus } from 'lucide-react'
 import { useFinanceStore } from '../store/useFinanceStore'
 import AssetForm from '../components/assets/AssetForm'
 import AssetList from '../components/assets/AssetList'
-import AssetCategorySummary from '../components/assets/AssetCategorySummary'
+import CategorySummary from '../components/common/CategorySummary'
+import CategoryManager from '../components/common/CategoryManager'
 import SuccessMessage from '../components/common/SuccessMessage'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useTransientMessage } from '../utils/useTransientMessage'
 
 export default function Assets() {
   const assets = useFinanceStore((s) => s.assets)
+  const categories = useFinanceStore((s) => s.categories.assets)
   const addAsset = useFinanceStore((s) => s.addAsset)
   const updateAsset = useFinanceStore((s) => s.updateAsset)
   const deleteAsset = useFinanceStore((s) => s.deleteAsset)
@@ -48,6 +50,7 @@ export default function Assets() {
 
       {showAddForm && (
         <AssetForm
+          categories={categories}
           submitLabel="הוסף נכס"
           onSubmit={(data) => {
             addAsset(data)
@@ -58,10 +61,13 @@ export default function Assets() {
         />
       )}
 
-      <AssetCategorySummary assets={assets} />
+      <CategoryManager domain="assets" items={assets} />
+
+      <CategorySummary items={assets} categories={categories} valueKey="value" />
 
       <AssetList
         assets={assets}
+        categories={categories}
         editingId={editingId}
         onStartEdit={(id) => {
           setShowAddForm(false)

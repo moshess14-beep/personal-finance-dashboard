@@ -8,17 +8,19 @@ import {
   selectTotalLiabilities,
   selectTotalMonthlySavings,
   selectTotalMonthlyIncome,
+  selectWorkIncome,
+  selectAssetIncome,
   selectMonthlyNetWorthGrowth,
   selectNetWorth,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
-import { ASSET_CATEGORIES, LIABILITY_CATEGORIES, INCOME_CATEGORIES } from '../utils/categories'
 import { summarizeByCategory } from '../utils/aggregations'
 import NetWorthHero from '../components/dashboard/NetWorthHero'
 import StatCard from '../components/dashboard/StatCard'
 import NetWorthProgressChart from '../components/dashboard/NetWorthProgressChart'
 import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
 import AssetsVsLiabilitiesMeter from '../components/dashboard/AssetsVsLiabilitiesMeter'
+import IncomeBreakdownMeter from '../components/dashboard/IncomeBreakdownMeter'
 import BackupControls from '../components/common/BackupControls'
 
 const sinceDateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -28,10 +30,15 @@ export default function Dashboard() {
   const liabilities = useFinanceStore((s) => s.liabilities)
   const incomeSources = useFinanceStore((s) => s.incomeSources)
   const historyPoints = useFinanceStore((s) => s.historyPoints)
+  const assetCategories = useFinanceStore((s) => s.categories.assets)
+  const liabilityCategories = useFinanceStore((s) => s.categories.liabilities)
+  const incomeCategories = useFinanceStore((s) => s.categories.income)
   const totalAssets = useFinanceStore(selectTotalAssets)
   const totalLiabilities = useFinanceStore(selectTotalLiabilities)
   const totalMonthlySavings = useFinanceStore(selectTotalMonthlySavings)
   const totalMonthlyIncome = useFinanceStore(selectTotalMonthlyIncome)
+  const workIncome = useFinanceStore(selectWorkIncome)
+  const assetIncome = useFinanceStore(selectAssetIncome)
   const monthlyGrowth = useFinanceStore(useShallow(selectMonthlyNetWorthGrowth))
   const netWorth = useFinanceStore(selectNetWorth)
   const recordNetWorthSnapshot = useFinanceStore((s) => s.recordNetWorthSnapshot)
@@ -44,7 +51,7 @@ export default function Dashboard() {
   }, [netWorth])
 
   const hasAnyData = assets.length > 0 || liabilities.length > 0
-  const topIncomeCategory = summarizeByCategory(incomeSources, INCOME_CATEGORIES, 'light', 'amount')[0]
+  const topIncomeCategory = summarizeByCategory(incomeSources, incomeCategories, 'light', 'amount')[0]
 
   // The chart should always reach "now", not stop at whatever date the last
   // manual history point happens to be. historyPoints themselves are frozen
@@ -129,22 +136,25 @@ export default function Dashboard() {
         <CategoryDonutChart
           title="חלוקת נכסים לפי קטגוריה"
           items={assets}
-          categories={ASSET_CATEGORIES}
+          categories={assetCategories}
           delay={0.24}
         />
         <CategoryDonutChart
           title="חלוקת התחייבויות לפי קטגוריה"
           items={liabilities}
-          categories={LIABILITY_CATEGORIES}
+          categories={liabilityCategories}
           delay={0.28}
         />
       </div>
 
-      <AssetsVsLiabilitiesMeter
-        totalAssets={totalAssets}
-        totalLiabilities={totalLiabilities}
-        delay={0.32}
-      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <AssetsVsLiabilitiesMeter
+          totalAssets={totalAssets}
+          totalLiabilities={totalLiabilities}
+          delay={0.32}
+        />
+        <IncomeBreakdownMeter workIncome={workIncome} assetIncome={assetIncome} delay={0.34} />
+      </div>
 
       <BackupControls />
     </div>

@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
-import { INCOME_CATEGORIES } from '../../utils/categories'
 
-const EMPTY = { name: '', category: INCOME_CATEGORIES[0].id, amount: '', note: '' }
+const EMPTY = { name: '', category: '', amount: '', incomeType: 'work', note: '' }
 
-export default function IncomeSourceForm({ initialValues, onSubmit, onCancel, submitLabel }) {
-  const [values, setValues] = useState(() => ({ ...EMPTY, ...initialValues }))
+export default function IncomeSourceForm({ categories, initialValues, onSubmit, onCancel, submitLabel }) {
+  const defaultCategory = categories.find((c) => !c.hidden)?.id ?? categories[0]?.id ?? ''
+  const [values, setValues] = useState(() => ({
+    ...EMPTY,
+    category: defaultCategory,
+    ...initialValues,
+  }))
   const [error, setError] = useState('')
 
   function handleChange(field, val) {
@@ -26,6 +30,7 @@ export default function IncomeSourceForm({ initialValues, onSubmit, onCancel, su
       name: values.name.trim(),
       category: values.category,
       amount: Number(values.amount),
+      incomeType: values.incomeType,
       note: values.note.trim(),
     })
   }
@@ -58,11 +63,13 @@ export default function IncomeSourceForm({ initialValues, onSubmit, onCancel, su
           onChange={(e) => handleChange('category', e.target.value)}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
         >
-          {INCOME_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
+          {categories
+            .filter((c) => !c.hidden || c.id === values.category)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
         </select>
       </div>
 
@@ -81,6 +88,20 @@ export default function IncomeSourceForm({ initialValues, onSubmit, onCancel, su
       </div>
 
       <div className="sm:col-span-1">
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          סוג הכנסה
+        </label>
+        <select
+          value={values.incomeType}
+          onChange={(e) => handleChange('incomeType', e.target.value)}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+        >
+          <option value="work">עבודה</option>
+          <option value="assets">נכסים</option>
+        </select>
+      </div>
+
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
           הערה (לא חובה)
         </label>
