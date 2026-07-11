@@ -10,6 +10,7 @@ import { PLATFORMS, PLATFORM_BY_ID } from '../data/platforms'
 export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
   const removeItem = useLibraryStore((s) => s.removeItem)
+  const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState(item.myNote || '')
   const [checking, setChecking] = useState(false)
@@ -23,16 +24,18 @@ export default function ItemDetail({ item, onClose }) {
     setChecking(true)
     setCheckResult(null)
     try {
-      const fresh = await fetchAvailability(item)
+      const { availability: fresh, found } = await fetchAvailability(item, tmdbKey)
       const manual = availability.filter((a) => a.manual)
       const merged = [
         ...fresh.filter((f) => !manual.some((m) => m.platform === f.platform)),
         ...manual,
       ]
       updateItem(item.id, { availability: merged, availabilityCheckedAt: Date.now() })
-      setCheckResult(fresh.length > 0 ? 'עודכן ✓' : 'לא נמצאה זמינות בפלטפורמות המוכרות')
+      if (fresh.length > 0) setCheckResult('עודכן ✓')
+      else if (found) setCheckResult('לא זמין כרגע בשירותי הסטרימינג בישראל')
+      else setCheckResult('לא נמצאה יצירה תואמת — אפשר לסמן ידנית למטה')
     } catch {
-      setCheckResult('הבדיקה נכשלה — נסו שוב מאוחר יותר')
+      setCheckResult('לא הצלחתי להתחבר לשירות הזמינות כרגע — אפשר לנסות שוב או לסמן ידנית')
     }
     setChecking(false)
   }
