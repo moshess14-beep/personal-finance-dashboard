@@ -24,6 +24,7 @@ function candidateToForm(c, identification) {
     year: c.year || '',
     pages: c.pages || '',
     runtimeMinutes: c.runtimeMinutes || '',
+    episodeRuntimeMinutes: c.episodeRuntimeMinutes || '',
     seasons: c.seasons || '',
     genresText: (c.genres || []).join(', '),
     summary: c.summary || '',
@@ -35,6 +36,21 @@ function candidateToForm(c, identification) {
   }
 }
 
+// ניקוד התאמה בין שורת טקסט מהתמונה לשם תוצאה — לזיהוי אוטומטי
+function titleScore(line, title) {
+  const norm = (s) => (s || '').replace(/[^א-תa-z0-9\s]+/gi, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+  const a = norm(line)
+  const b = norm(title)
+  if (!a || !b) return 0
+  if (a === b) return 3
+  if (a.includes(b) || b.includes(a)) return 2
+  const ta = new Set(a.split(' '))
+  const tb = b.split(' ')
+  const overlap = tb.filter((t) => ta.has(t)).length
+  if (overlap >= 2 || (tb.length > 0 && overlap / tb.length >= 0.6)) return 1
+  return 0
+}
+
 export default function AddFlow({ mode, file, onClose, onSaved }) {
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const addItem = useLibraryStore((s) => s.addItem)
@@ -43,6 +59,8 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
   const [imageUrl, setImageUrl] = useState(null)
   const [ocrProgress, setOcrProgress] = useState(0)
   const [ocrLines, setOcrLines] = useState(null)
+  const [autoSearching, setAutoSearching] = useState(false)
+  const [autoIdentified, setAutoIdentified] = useState(false)
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -55,12 +73,30 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
     setImageUrl(url)
     let cancelled = false
     extractTextFromImage(file, (p) => !cancelled && setOcrProgress(p))
-      .then((text) => {
+      .then(async (text) => {
         if (cancelled) return
         const lines = pickCandidateLines(text)
         setOcrLines(lines)
-        if (lines.length === 0)
+        if (lines.length === 0) {
           setError('לא זוהה טקסט ברור בתמונה — אפשר להקליד את השם ידנית')
+          return
+        }
+        // זיהוי אוטומטי: מחפשים ברשת את השורות המבטיחות בלי לשאול את המשתמש
+        setAutoSearching(true)
+        try {
+          const found = await autoSearchLines(lines)
+          if (cancelled) return
+          if (found) {
+            setResults(found)
+            setAutoIdentified(true)
+            setStep('results')
+          } else {
+            setError('לא זיהיתי לבד — בחרו את השורה שהיא שם היצירה, או תקנו ידנית')
+          }
+        } catch {
+          if (!cancelled) setError('החיפוש ברשת נכשל — בחרו שורה או הקלידו את השם')
+        }
+        if (!cancelled) setAutoSearching(false)
       })
       .catch(
         () => !cancelled && setError('קריאת התמונה נכשלה — אפשר להקליד את השם ידנית'),
@@ -69,7 +105,36 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
       cancelled = true
       URL.revokeObjectURL(url)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, file])
+
+  // מחפש כל שורה מבטיחה במקביל, מדרג לפי דמיון בין השורה לשם התוצאה
+  async function autoSearchLines(lines) {
+    const tried = lines.slice(0, 4)
+    const settled = await Promise.allSettled(tried.map((l) => searchAll(l, tmdbKey)))
+    const scored = []
+    settled.forEach((s, i) => {
+      if (s.status !== 'fulfilled') return
+      for (const group of ['books', 'screen']) {
+        for (const c of s.value[group]) {
+          const score = titleScore(tried[i], c.titleHe)
+          if (score > 0) scored.push({ c, score, group })
+        }
+      }
+    })
+    if (scored.length === 0) return null
+    scored.sort((a, b) => b.score - a.score)
+    const seen = new Set()
+    const books = []
+    const screen = []
+    for (const { c, group } of scored) {
+      const key = `${group}|${c.type}|${(c.titleHe || '').trim()}|${c.year || ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      ;(group === 'books' ? books : screen).push(c)
+    }
+    return { books: books.slice(0, 4), screen: screen.slice(0, 4) }
+  }
 
   async function doSearch(q) {
     const text = (q ?? query).trim()
@@ -120,6 +185,8 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
       year: parseInt(form.year) || null,
       pages: form.type === 'book' ? parseInt(form.pages) || null : null,
       runtimeMinutes: form.type === 'movie' ? parseInt(form.runtimeMinutes) || null : null,
+      episodeRuntimeMinutes:
+        form.type === 'series' ? parseInt(form.episodeRuntimeMinutes) || null : null,
       seasons: form.type === 'series' ? parseInt(form.seasons) || null : null,
       genres: form.genresText.split(',').map((g) => g.trim()).filter(Boolean),
       summary: form.summary,
@@ -166,6 +233,11 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
                   style={{ width: `${ocrProgress * 100}%` }}
                 />
               </div>
+            </div>
+          ) : autoSearching ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              מזהה אוטומטית את היצירה ומחפש ברשת…
             </div>
           ) : (
             <>
@@ -221,6 +293,11 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
 
       {step === 'results' && results && (
         <div className="space-y-4">
+          {autoIdentified && (
+            <div className="bg-indigo-50 text-indigo-700 text-xs rounded-xl px-3 py-2 font-semibold">
+              זיהיתי אוטומטית מתוך התמונה — בחרו את ההתאמה הנכונה:
+            </div>
+          )}
           {busy && (
             <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold">
               <Loader2 className="w-4 h-4 animate-spin" /> טוען פרטים…
@@ -243,6 +320,17 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
             />
           )}
           <div className="flex gap-2 pt-1">
+            {mode === 'image' && ocrLines?.length > 0 && (
+              <button
+                onClick={() => {
+                  setAutoIdentified(false)
+                  setStep('ocr')
+                }}
+                className="flex-1 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl py-2.5"
+              >
+                בחירה מהטקסט שזוהה
+              </button>
+            )}
             <button
               onClick={() => setStep('query')}
               className="flex-1 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl py-2.5"
@@ -296,6 +384,14 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
             {form.type === 'series' && (
               <Field label="עונות" value={form.seasons} onChange={setF('seasons')} type="number" />
             )}
+            {form.type === 'series' && (
+              <Field
+                label="אורך פרק (דקות)"
+                value={form.episodeRuntimeMinutes}
+                onChange={setF('episodeRuntimeMinutes')}
+                type="number"
+              />
+            )}
             <Field label="ז'אנרים (מופרדים בפסיק)" value={form.genresText} onChange={setF('genresText')} />
           </div>
 
@@ -313,16 +409,18 @@ export default function AddFlow({ mode, file, onClose, onSaved }) {
             <div className="bg-slate-50 rounded-xl px-3 py-2">
               <div className="text-[11px] font-bold text-slate-400 mb-1">זמין לצפייה ב־</div>
               <div className="flex flex-wrap gap-1.5">
-                {form.availability.map((a) => {
+                {form.availability.map((a, i) => {
                   const p = PLATFORM_BY_ID[a.platform]
-                  if (!p) return null
                   return (
                     <span
-                      key={a.platform}
+                      key={`${a.platform}-${a.label || i}`}
                       className="flex items-center gap-1 text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5 font-semibold text-slate-600"
                     >
-                      <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                      {p.label} · {a.kind}
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: p?.color || '#94a3b8' }}
+                      />
+                      {p?.label || a.label} · {a.kind}
                     </span>
                   )
                 })}

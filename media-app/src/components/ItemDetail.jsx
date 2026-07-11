@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Star, Trash2 } from 'lucide-react'
+import { Star, Trash2, RefreshCw, Loader2 } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
 import useLibraryStore from '../store/useLibraryStore'
+import { fetchAvailability } from '../services/search'
 import { STATUSES, TYPE_LABEL, TYPE_BADGE_STYLE, CREATOR_LABEL } from '../data/constants'
 import { PLATFORMS, PLATFORM_BY_ID } from '../data/platforms'
 
@@ -11,9 +12,30 @@ export default function ItemDetail({ item, onClose }) {
   const removeItem = useLibraryStore((s) => s.removeItem)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState(item.myNote || '')
+  const [checking, setChecking] = useState(false)
+  const [checkResult, setCheckResult] = useState(null)
 
   const isScreen = item.type !== 'book'
   const availability = item.availability || []
+
+  // בדיקת זמינות מחדש: שומרים סימונים ידניים, מחליפים את האוטומטיים
+  async function checkAvailability() {
+    setChecking(true)
+    setCheckResult(null)
+    try {
+      const fresh = await fetchAvailability(item)
+      const manual = availability.filter((a) => a.manual)
+      const merged = [
+        ...fresh.filter((f) => !manual.some((m) => m.platform === f.platform)),
+        ...manual,
+      ]
+      updateItem(item.id, { availability: merged, availabilityCheckedAt: Date.now() })
+      setCheckResult(fresh.length > 0 ? 'עודכן ✓' : 'לא נמצאה זמינות בפלטפורמות המוכרות')
+    } catch {
+      setCheckResult('הבדיקה נכשלה — נסו שוב מאוחר יותר')
+    }
+    setChecking(false)
+  }
 
   const togglePlatform = (platformId) => {
     const has = availability.some((a) => a.platform === platformId)
@@ -29,6 +51,9 @@ export default function ItemDetail({ item, onClose }) {
     item.type === 'book' && item.pages ? `${item.pages} עמ'` : null,
     item.type === 'movie' && item.runtimeMinutes ? `${item.runtimeMinutes} דק'` : null,
     item.type === 'series' && item.seasons ? `${item.seasons} עונות` : null,
+    item.type === 'series' && item.episodeRuntimeMinutes
+      ? `כ־${item.episodeRuntimeMinutes} דק' לפרק`
+      : null,
   ].filter(Boolean)
 
   return (
@@ -122,9 +147,26 @@ export default function ItemDetail({ item, onClose }) {
 
         {isScreen && (
           <div>
-            <div className="text-[11px] font-bold text-slate-400 mb-1.5">
-              זמין לצפייה ב־ <span className="font-normal">(הקישו כדי לסמן/לבטל ידנית)</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[11px] font-bold text-slate-400">
+                זמין לצפייה ב־ <span className="font-normal">(הקישו כדי לסמן/לבטל ידנית)</span>
+              </div>
+              <button
+                onClick={checkAvailability}
+                disabled={checking}
+                className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-full px-2.5 py-1 disabled:opacity-50"
+              >
+                {checking ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+                בדיקת זמינות עכשיו
+              </button>
             </div>
+            {checkResult && (
+              <div className="text-[11px] text-slate-500 font-semibold mb-1.5">{checkResult}</div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {PLATFORMS.map((p) => {
                 const entry = availability.find((a) => a.platform === p.id)
@@ -146,7 +188,24 @@ export default function ItemDetail({ item, onClose }) {
                   </button>
                 )
               })}
+              {availability
+                .filter((a) => a.platform === 'other')
+                .map((a, i) => (
+                  <span
+                    key={`other-${i}`}
+                    className="flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 border border-slate-300 bg-slate-100 text-slate-600 font-semibold"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    {a.label}
+                    {a.kind !== 'מנוי' && <span className="text-[10px] opacity-75">({a.kind})</span>}
+                  </span>
+                ))}
             </div>
+            {item.availabilityCheckedAt && (
+              <div className="text-[10px] text-slate-400 mt-1.5">
+                נבדק לאחרונה: {new Date(item.availabilityCheckedAt).toLocaleDateString('he-IL')}
+              </div>
+            )}
           </div>
         )}
 
