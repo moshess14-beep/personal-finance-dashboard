@@ -23,11 +23,11 @@ export default function SettingsModal({ onClose }) {
         )}
 
         <div>
-          <div className="text-sm font-bold text-slate-700 mb-1">מפתח TMDB (לסרטים וסדרות)</div>
+          <div className="text-sm font-bold text-slate-700 mb-1">מפתח TMDB (אופציונלי)</div>
           <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
-            עם מפתח חינמי מאתר themoviedb.org מתקבלים פרטים מלאים בעברית — כולל אורך, ז'אנרים,
-            פוסטרים <b>וזמינות בפלטפורמות סטרימינג בישראל</b>. בלי מפתח, המידע על סרטים וסדרות
-            מגיע מוויקיפדיה העברית והוא חלקי.
+            בדרך כלל אין צורך: פרטי סרטים וסדרות — כולל <b>זמינות בפלטפורמות סטרימינג בישראל</b> —
+            מגיעים אוטומטית ללא מפתח. מפתח חינמי מאתר themoviedb.org משמש כמקור גיבוי נוסף
+            ומשלים פרטים כמו במאי ותקציר מורחב.
           </p>
           <div className="flex gap-2">
             <input

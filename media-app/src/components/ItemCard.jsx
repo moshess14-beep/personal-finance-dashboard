@@ -9,6 +9,8 @@ function metaLine(item) {
   if (item.type === 'book' && item.pages) parts.push(`${item.pages} עמ'`)
   if (item.type === 'movie' && item.runtimeMinutes) parts.push(`${item.runtimeMinutes} דק'`)
   if (item.type === 'series' && item.seasons) parts.push(`${item.seasons} עונות`)
+  if (item.type === 'series' && item.episodeRuntimeMinutes)
+    parts.push(`${item.episodeRuntimeMinutes} דק' לפרק`)
   return parts.join(' · ')
 }
 
@@ -46,15 +48,14 @@ export default function ItemCard({ item, onOpen }) {
             </span>
           )}
           <span className="ms-auto flex items-center gap-0.5">
-            {(item.availability || []).slice(0, 4).map((a) => {
+            {(item.availability || []).slice(0, 4).map((a, i) => {
               const p = PLATFORM_BY_ID[a.platform]
-              if (!p) return null
               return (
                 <span
-                  key={a.platform}
-                  title={`${p.label} (${a.kind})`}
+                  key={`${a.platform}-${a.label || i}`}
+                  title={`${p?.label || a.label || ''} (${a.kind})`}
                   className="w-2.5 h-2.5 rounded-full border border-white shadow-sm"
-                  style={{ background: p.color }}
+                  style={{ background: p?.color || '#94a3b8' }}
                 />
               )
             })}

@@ -1,7 +1,8 @@
 import { DEMO } from './env'
 import { TMDB_GENRES_HE, translateBookCategory } from '../data/genres'
 import { TMDB_PROVIDER_MAP } from '../data/platforms'
-import { demoSearch } from '../data/demoData'
+import { demoSearch, demoAvailability } from '../data/demoData'
+import { searchJustWatch } from './justwatch'
 
 // חיפוש מאוחד: ספרים (Google Books) + סרטים/סדרות (TMDB אם יש מפתח, אחרת ויקיפדיה עברית)
 export async function searchAll(query, tmdbKey) {
@@ -55,7 +56,14 @@ async function gbooksQuery(query, hebrewOnly) {
 
 // ---------- סרטים וסדרות ----------
 
+// סדר עדיפויות: JustWatch (ללא מפתח, כולל זמינות בישראל) → TMDB (אם יש מפתח) → ויקיפדיה
 async function searchScreen(query, tmdbKey) {
+  try {
+    const jw = await searchJustWatch(query)
+    if (jw.length > 0) return jw
+  } catch {
+    // JustWatch לא זמין — ממשיכים למקורות הבאים
+  }
   if (tmdbKey) {
     try {
       return await searchScreenTmdb(query, tmdbKey)
@@ -64,6 +72,25 @@ async function searchScreen(query, tmdbKey) {
     }
   }
   return searchScreenWiki(query)
+}
+
+// רענון זמינות סטרימינג לפריט שמור (כפתור "בדיקת זמינות עכשיו")
+export async function fetchAvailability(item) {
+  if (DEMO) return demoAvailability(item)
+  const norm = (s) => (s || '').replace(/[^א-תa-z0-9]+/gi, '').toLowerCase()
+  const results = await searchJustWatch(item.titleHe)
+  const sameType = results.filter((r) => r.type === item.type)
+  const best =
+    sameType.find(
+      (r) =>
+        norm(r.titleHe) === norm(item.titleHe) &&
+        (!item.year || !r.year || Math.abs(r.year - item.year) <= 1),
+    ) ||
+    sameType.find(
+      (r) => norm(r.titleHe).includes(norm(item.titleHe)) || norm(item.titleHe).includes(norm(r.titleHe)),
+    )
+  if (!best) throw new Error('not found')
+  return best.availability || []
 }
 
 async function searchScreenTmdb(query, key) {
@@ -163,6 +190,7 @@ export async function enrichCandidate(candidate, tmdbKey) {
     out.creator = d.credits?.crew?.find((p) => p.job === 'Director')?.name || candidate.creator
   } else {
     out.seasons = d.number_of_seasons || null
+    out.episodeRuntimeMinutes = d.episode_run_time?.[0] || null
     out.isEnded = d.status === 'Ended'
     out.creator = d.created_by?.[0]?.name || candidate.creator
   }

@@ -41,6 +41,30 @@ export const TMDB_GENRES_HE = {
   },
 }
 
+// מיפוי קודי ז'אנר של JustWatch לעברית
+export const JW_GENRES_HE = {
+  act: 'אקשן',
+  ani: 'אנימציה',
+  cmy: 'קומדיה',
+  crm: 'פשע',
+  doc: 'דוקומנטרי',
+  drm: 'דרמה',
+  eur: 'אירופאי',
+  fml: 'משפחה',
+  fnt: 'פנטזיה',
+  hst: 'היסטוריה',
+  hrr: 'אימה',
+  msc: 'מוזיקה',
+  mys: 'מסתורין',
+  rma: 'רומנטיקה',
+  scf: 'מדע בדיוני',
+  spt: 'ספורט',
+  trl: 'מותחן',
+  war: 'מלחמה',
+  wsn: 'מערבון',
+  rly: 'ריאליטי',
+}
+
 // תרגום קטגוריות נפוצות של Google Books לעברית
 const GBOOKS_CATEGORY_HE = {
   'fiction': 'פרוזה',

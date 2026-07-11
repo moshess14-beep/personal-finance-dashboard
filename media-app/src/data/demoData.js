@@ -122,6 +122,7 @@ export const demoItems = [
     creator: 'יהונתן אינדורסקי ואורי אלון',
     year: 2013,
     seasons: 3,
+    episodeRuntimeMinutes: 45,
     genres: ['דרמה'],
     summary: 'חיי משפחה חרדית בשכונת גאולה בירושלים — בין מסורת, אהבה ואמנות.',
     status: 'הושלם',
@@ -138,6 +139,7 @@ export const demoItems = [
     creator: 'ליאור רז ואבי יששכרוף',
     year: 2015,
     seasons: 4,
+    episodeRuntimeMinutes: 40,
     genres: ['מתח', 'אקשן'],
     summary: 'יחידת מסתערבים ישראלית בפעילות מבצעית — מתח, נאמנות ומחיר אישי.',
     status: 'בתהליך',
@@ -181,7 +183,7 @@ const demoPool = {
     },
     {
       source: 'demo', type: 'series', titleHe: 'הכתר', titleOriginal: 'The Crown',
-      creator: 'פיטר מורגן', year: 2016, seasons: 6, genres: ['דרמה', 'היסטוריה'],
+      creator: 'פיטר מורגן', year: 2016, seasons: 6, episodeRuntimeMinutes: 58, genres: ['דרמה', 'היסטוריה'],
       summary: 'חייה של המלכה אליזבת השנייה, מחתונתה ועד ימינו.',
       availability: [{ platform: 'netflix', kind: 'מנוי', manual: false }],
     },
@@ -221,4 +223,11 @@ export async function demoOcr(onProgress) {
     onProgress(i / 10)
   }
   return demoOcrText
+}
+
+// רענון זמינות מדומה במצב הדגמה
+export async function demoAvailability(item) {
+  await sleep(900)
+  if (item.availability?.length) return item.availability.filter((a) => !a.manual)
+  return [{ platform: 'netflix', kind: 'מנוי', manual: false }]
 }
