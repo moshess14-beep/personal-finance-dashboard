@@ -2,9 +2,8 @@ import { useMemo } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { PLATFORMS } from '../data/platforms'
 
-const TYPE_OPTIONS = [
+const SCREEN_TYPE_OPTIONS = [
   { value: 'all', label: 'הכול' },
-  { value: 'book', label: 'ספרים' },
   { value: 'movie', label: 'סרטים' },
   { value: 'series', label: 'סדרות' },
 ]
@@ -34,7 +33,8 @@ function ChipRow({ label, children }) {
   )
 }
 
-export default function FiltersBar({ items, filters, setFilters, shownCount }) {
+// סרגל סינון בתוך קטגוריה: ספרים — ז'אנר בלבד; סרטים — סוג + ז'אנר + פלטפורמת סטרימינג
+export default function FiltersBar({ mode, items, filters, setFilters, shownCount }) {
   const genres = useMemo(
     () =>
       [...new Set(items.flatMap((i) => i.genres || []))].sort((a, b) =>
@@ -54,17 +54,21 @@ export default function FiltersBar({ items, filters, setFilters, shownCount }) {
       <div className="max-w-lg mx-auto px-3 py-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {TYPE_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.value}
-                active={filters.type === opt.value}
-                onClick={() => setFilters((f) => ({ ...f, type: opt.value }))}
-              >
-                {opt.label}
-              </Chip>
-            ))}
-          </div>
+          {mode === 'screen' ? (
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              {SCREEN_TYPE_OPTIONS.map((opt) => (
+                <Chip
+                  key={opt.value}
+                  active={filters.type === opt.value}
+                  onClick={() => setFilters((f) => ({ ...f, type: opt.value }))}
+                >
+                  {opt.label}
+                </Chip>
+              ))}
+            </div>
+          ) : (
+            <span className="text-[11px] font-bold text-slate-400">סינון</span>
+          )}
           <span className="ms-auto text-[11px] text-slate-400 shrink-0 font-semibold">
             {shownCount} פריטים
           </span>
@@ -80,18 +84,20 @@ export default function FiltersBar({ items, filters, setFilters, shownCount }) {
           </ChipRow>
         )}
 
-        <ChipRow label="זמין ב־">
-          {PLATFORMS.map((p) => (
-            <Chip
-              key={p.id}
-              color={p.color}
-              active={filters.platform === p.id}
-              onClick={() => toggle('platform', p.id)}
-            >
-              {p.label}
-            </Chip>
-          ))}
-        </ChipRow>
+        {mode === 'screen' && (
+          <ChipRow label="זמין ב־">
+            {PLATFORMS.map((p) => (
+              <Chip
+                key={p.id}
+                color={p.color}
+                active={filters.platform === p.id}
+                onClick={() => toggle('platform', p.id)}
+              >
+                {p.label}
+              </Chip>
+            ))}
+          </ChipRow>
+        )}
       </div>
     </div>
   )
