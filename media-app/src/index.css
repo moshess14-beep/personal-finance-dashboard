@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Heebo", "Assistant", "Arial Hebrew", Arial, sans-serif;
+}
+
+body {
+  background: #f1f5f9;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}

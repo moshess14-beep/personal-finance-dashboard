@@ -26,12 +26,26 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            media-app/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build
         run: npm run build
+
+      - name: Install media app dependencies
+        run: npm ci
+        working-directory: media-app
+
+      - name: Build media app
+        run: npm run build
+        working-directory: media-app
+
+      - name: Merge media app into site
+        run: mv media-app/dist dist/media
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

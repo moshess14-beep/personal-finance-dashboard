@@ -1,0 +1,14 @@
+{
+  "name": "הספרייה שלי — ספרים, סרטים וסדרות",
+  "short_name": "הספרייה שלי",
+  "description": "שמירה וסינון של ספרים, סרטים וסדרות מומלצים",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
