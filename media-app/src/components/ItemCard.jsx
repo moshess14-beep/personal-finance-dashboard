@@ -1,17 +1,44 @@
 import { Star } from 'lucide-react'
 import Cover from './Cover'
-import { STATUS_STYLE } from '../data/constants'
+import { STATUS_STYLE, statusLabel } from '../data/constants'
 import { PLATFORM_BY_ID } from '../data/platforms'
 
 function metaLine(item) {
   const parts = []
-  if (item.year) parts.push(item.year)
-  if (item.type === 'book' && item.pages) parts.push(`${item.pages} עמ'`)
-  if (item.type === 'movie' && item.runtimeMinutes) parts.push(`${item.runtimeMinutes} דק'`)
-  if (item.type === 'series' && item.seasons) parts.push(`${item.seasons} עונות`)
-  if (item.type === 'series' && item.episodeRuntimeMinutes)
-    parts.push(`${item.episodeRuntimeMinutes} דק' לפרק`)
+  switch (item.type) {
+    case 'book':
+      if (item.year) parts.push(item.year)
+      if (item.pages) parts.push(`${item.pages} עמ'`)
+      break
+    case 'movie':
+      if (item.year) parts.push(item.year)
+      if (item.runtimeMinutes) parts.push(`${item.runtimeMinutes} דק'`)
+      break
+    case 'series':
+      if (item.year) parts.push(item.year)
+      if (item.seasons) parts.push(`${item.seasons} עונות`)
+      if (item.episodeRuntimeMinutes) parts.push(`${item.episodeRuntimeMinutes} דק' לפרק`)
+      break
+    case 'place':
+      if (item.region) parts.push(item.region)
+      if (item.placeTypes?.length) parts.push(item.placeTypes[0])
+      break
+    case 'recipe':
+      if (item.dishType) parts.push(item.dishType)
+      if (item.kashrut) parts.push(item.kashrut)
+      break
+    case 'product':
+      if (item.price) parts.push(`₪${item.price}`)
+      if (item.store) parts.push(item.store)
+      break
+  }
   return parts.join(' · ')
+}
+
+function chips(item) {
+  if (item.type === 'place') return item.audiences || []
+  if (item.type === 'recipe') return item.tags || []
+  return item.genres || []
 }
 
 export default function ItemCard({ item, onOpen }) {
@@ -27,19 +54,26 @@ export default function ItemCard({ item, onOpen }) {
         </div>
         <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{metaLine(item)}</div>
 
-        {item.genres?.length > 0 && (
+        {chips(item).length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {item.genres.slice(0, 2).map((g) => (
-              <span key={g} className="text-[10px] bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5">
-                {g}
-              </span>
-            ))}
+            {chips(item)
+              .slice(0, 2)
+              .map((g) => (
+                <span
+                  key={g}
+                  className="text-[10px] bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5"
+                >
+                  {g}
+                </span>
+              ))}
           </div>
         )}
 
         <div className="flex items-center gap-1 mt-1.5 min-h-4">
-          <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-semibold ${STATUS_STYLE[item.status] || STATUS_STYLE['רוצה']}`}>
-            {item.status || 'רוצה'}
+          <span
+            className={`text-[10px] rounded-full px-1.5 py-0.5 font-semibold ${STATUS_STYLE[item.status] || STATUS_STYLE['רוצה']}`}
+          >
+            {statusLabel(item.type, item.status || 'רוצה')}
           </span>
           {item.myRating > 0 && (
             <span className="flex items-center gap-0.5 text-[10px] text-amber-500 font-bold">

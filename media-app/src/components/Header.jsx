@@ -7,14 +7,16 @@ export default function Header({ onSettings }) {
       <div className="max-w-lg mx-auto px-4 pt-5 pb-4 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-black flex items-center gap-2">
-            📚 הספרייה שלי 🎬
+            ✨ ההמלצות שלי
             {DEMO && (
               <span className="text-[10px] font-bold bg-white/20 rounded-full px-2 py-0.5">
                 גרסת הדגמה
               </span>
             )}
           </h1>
-          <p className="text-xs text-white/80 mt-1">ספרים, סרטים וסדרות ששווה לזכור</p>
+          <p className="text-xs text-white/80 mt-1">
+            ספרים · סרטים · בילויים · מתכונים · מוצרים — הכול במקום אחד
+          </p>
         </div>
         <button
           onClick={onSettings}

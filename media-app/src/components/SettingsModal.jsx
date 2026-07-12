@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Sparkles } from 'lucide-react'
 import Modal from './Modal'
 import useLibraryStore from '../store/useLibraryStore'
 import { DEMO } from '../services/env'
@@ -6,10 +7,14 @@ import { DEMO } from '../services/env'
 export default function SettingsModal({ onClose }) {
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const setTmdbKey = useLibraryStore((s) => s.setTmdbKey)
+  const aiKey = useLibraryStore((s) => s.aiKey)
+  const setAiKey = useLibraryStore((s) => s.setAiKey)
   const seedDemo = useLibraryStore((s) => s.seedDemo)
   const clearAll = useLibraryStore((s) => s.clearAll)
   const [key, setKey] = useState(tmdbKey)
+  const [gKey, setGKey] = useState(aiKey)
   const [saved, setSaved] = useState(false)
+  const [gSaved, setGSaved] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
 
   return (
@@ -21,6 +26,37 @@ export default function SettingsModal({ onClose }) {
             בגרסה המלאה החיפוש רץ מול מקורות אמיתיים.
           </div>
         )}
+
+        <div>
+          <div className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-indigo-500" />
+            מפתח AI — זיהוי תמונות חכם (מומלץ מאוד!)
+          </div>
+          <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
+            עם מפתח Gemini <b>חינמי</b> (מ-aistudio.google.com → Get API key), האפליקציה מזהה
+            מצילום המסך בבת אחת: מה זה (ספר/סרט/בילוי/מתכון/מוצר), מה השם, ואילו פרטים מופיעים —
+            ומשלימה אוטומטית פרטים חסרים. בלי מפתח: קריאת טקסט בסיסית בלבד.
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={gKey}
+              onChange={(e) => setGKey(e.target.value)}
+              placeholder="הדביקו כאן את מפתח ה-Gemini…"
+              dir="ltr"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+            />
+            <button
+              onClick={() => {
+                setAiKey(gKey.trim())
+                setGSaved(true)
+                setTimeout(() => setGSaved(false), 1500)
+              }}
+              className="bg-indigo-600 text-white rounded-xl px-4 text-sm font-bold"
+            >
+              {gSaved ? '✓ נשמר' : 'שמירה'}
+            </button>
+          </div>
+        </div>
 
         <div>
           <div className="text-sm font-bold text-slate-700 mb-1">מפתח TMDB (אופציונלי)</div>
