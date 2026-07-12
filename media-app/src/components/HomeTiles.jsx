@@ -1,5 +1,4 @@
 import { ChevronLeft } from 'lucide-react'
-import { CATEGORIES } from '../data/constants'
 
 function Tile({ category, count, onClick, wide }) {
   return (
@@ -14,7 +13,7 @@ function Tile({ category, count, onClick, wide }) {
       <span className={wide ? 'text-4xl drop-shadow' : 'text-4xl drop-shadow'}>{category.emoji}</span>
       <span className={wide ? 'text-right' : 'text-center'}>
         <span className="block text-xl font-black drop-shadow">{category.label}</span>
-        <span className="block text-[11px] font-semibold text-white/80">{category.sub}</span>
+        {category.sub && <span className="block text-[11px] font-semibold text-white/80">{category.sub}</span>}
       </span>
       <span className="text-[11px] font-bold bg-white/20 rounded-full px-2.5 py-0.5 mt-0.5">
         {count}
@@ -24,18 +23,20 @@ function Tile({ category, count, onClick, wide }) {
   )
 }
 
-// מסך הבית: קטגוריות ההמלצות (מספר זוגי → תמיד גריד מלא בלי אריח רחב)
-export default function HomeTiles({ items, onOpen }) {
-  const countFor = (cat) => items.filter((it) => cat.types.includes(it.type)).length
+// מסך הבית: קטגוריות ההמלצות של המשתמש (ניתנות לעריכה — ראו CategoryManagerModal)
+export default function HomeTiles({ categories, items, onOpen }) {
+  const countFor = (cat) =>
+    items.filter((it) => (cat.builtin ? cat.types.includes(it.type) : it.categoryId === cat.id)).length
+
   return (
     <div className="grid grid-cols-2 gap-3 mt-5">
-      {CATEGORIES.map((cat, i) => (
+      {categories.map((cat, i) => (
         <Tile
           key={cat.id}
           category={cat}
           count={countFor(cat)}
           onClick={() => onOpen(cat.id)}
-          wide={i === CATEGORIES.length - 1 && CATEGORIES.length % 2 === 1}
+          wide={i === categories.length - 1 && categories.length % 2 === 1}
         />
       ))}
     </div>

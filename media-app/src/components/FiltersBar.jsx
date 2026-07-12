@@ -2,17 +2,7 @@ import { useMemo } from 'react'
 import { SlidersHorizontal, ArrowDownWideNarrow } from 'lucide-react'
 import { PLATFORMS } from '../data/platforms'
 import { SORT_OPTIONS, SORT_OPTIONS_LIVE } from '../data/constants'
-import {
-  PLACE_TYPES,
-  AUDIENCES,
-  REGIONS,
-  DISH_TYPES,
-  KASHRUT,
-  RECIPE_TAGS,
-  PRODUCT_CATEGORIES,
-  MUSIC_GENRES,
-  SHOW_TYPES,
-} from '../data/taxonomies'
+import { MUSIC_GENRES, SHOW_TYPES } from '../data/taxonomies'
 
 const TYPE_TOGGLE_OPTIONS = {
   screen: [
@@ -52,53 +42,45 @@ function ChipRow({ label, children }) {
   )
 }
 
-// שורות הסינון לכל קטגוריה
-function rowsFor(mode, genres) {
-  switch (mode) {
-    case 'books':
-      return [{ key: 'genre', label: "ז'אנר", options: genres }]
-    case 'screen':
-      return [
-        { key: 'genre', label: "ז'אנר", options: genres },
-        { key: 'platform', label: 'זמין ב־', options: PLATFORMS, platform: true },
-      ]
-    case 'places':
-      return [
-        { key: 'placeType', label: 'סוג', options: PLACE_TYPES },
-        { key: 'audience', label: 'למי', options: AUDIENCES },
-        { key: 'region', label: 'אזור', options: REGIONS },
-      ]
-    case 'recipes':
-      return [
-        { key: 'dishType', label: 'מנה', options: DISH_TYPES },
-        { key: 'kashrut', label: 'כשרות', options: KASHRUT },
-        { key: 'tag', label: 'תגית', options: RECIPE_TAGS },
-      ]
-    case 'products':
-      return [{ key: 'productCategory', label: 'קטגוריה', options: PRODUCT_CATEGORIES }]
-    case 'live':
-      return [
-        { key: 'genre', label: 'סגנון', options: MUSIC_GENRES },
-        { key: 'showType', label: 'סוג', options: SHOW_TYPES },
-      ]
-    default:
-      return []
+// שורות הסינון לכל קטגוריה. built-in (ספרים/צפייה/הופעות) מקבלות סינון ייעודי;
+// קטגוריות רגילות מקבלות סינון גנרי לפי "סוג" ותגיות חופשיות שנגזרות מהפריטים בפועל.
+function rowsFor(category, items) {
+  if (category.id === 'books') {
+    return [{ key: 'genre', label: "ז'אנר", options: uniqueValues(items, 'genres') }]
   }
+  if (category.id === 'screen') {
+    return [
+      { key: 'genre', label: "ז'אנר", options: uniqueValues(items, 'genres') },
+      { key: 'platform', label: 'זמין ב־', options: PLATFORMS, platform: true },
+    ]
+  }
+  if (category.id === 'live') {
+    return [
+      { key: 'genre', label: 'סגנון', options: MUSIC_GENRES },
+      { key: 'showType', label: 'סוג', options: SHOW_TYPES },
+    ]
+  }
+  return [
+    { key: 'kind', label: 'סוג', options: uniqueValues(items, 'kind') },
+    { key: 'tag', label: 'תגית', options: uniqueValues(items, 'tags') },
+  ]
 }
 
-export default function FiltersBar({ mode, items, filters, setFilters, sort, setSort, shownCount }) {
-  const genres = useMemo(
-    () =>
-      [...new Set(items.flatMap((i) => i.genres || []))].sort((a, b) => a.localeCompare(b, 'he')),
-    [items],
-  )
+function uniqueValues(items, field) {
+  const values = items.flatMap((i) => {
+    const v = i[field]
+    return Array.isArray(v) ? v : v ? [v] : []
+  })
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'he'))
+}
+
+export default function FiltersBar({ category, items, filters, setFilters, sort, setSort, shownCount }) {
+  const rows = useMemo(() => rowsFor(category, items).filter((r) => r.options.length > 0), [category, items])
+  const typeOptions = TYPE_TOGGLE_OPTIONS[category.id]
+  const sortOptions = category.id === 'live' ? SORT_OPTIONS_LIVE : SORT_OPTIONS
 
   const toggle = (key, value) =>
     setFilters((f) => ({ ...f, [key]: f[key] === value ? null : value }))
-
-  const rows = rowsFor(mode, genres).filter((r) => r.options.length > 0)
-  const typeOptions = TYPE_TOGGLE_OPTIONS[mode]
-  const sortOptions = mode === 'live' ? SORT_OPTIONS_LIVE : SORT_OPTIONS
 
   return (
     <div

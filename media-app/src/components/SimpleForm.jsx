@@ -1,18 +1,9 @@
 import { useState } from 'react'
 import { Loader2, MapPin, Search } from 'lucide-react'
 import { searchPlaceAddress, mapsSearchUrl } from '../services/places'
-import {
-  PLACE_TYPES,
-  AUDIENCES,
-  REGIONS,
-  DISH_TYPES,
-  KASHRUT,
-  RECIPE_TAGS,
-  PRODUCT_CATEGORIES,
-  MUSIC_GENRES,
-  SHOW_TYPES,
-} from '../data/taxonomies'
-import { TYPE_LABEL, CREATOR_LABEL } from '../data/constants'
+import { MUSIC_GENRES, SHOW_TYPES } from '../data/taxonomies'
+import { CREATOR_LABEL } from '../data/constants'
+import TagEditor from './TagEditor'
 
 function ToggleChips({ label, options, selected, onToggle, single }) {
   const isSelected = (opt) => (single ? selected === opt : (selected || []).includes(opt))
@@ -55,23 +46,18 @@ function Field({ label, value, onChange, type = 'text', placeholder, dir }) {
   )
 }
 
-const HAS_ADDRESS = ['place', 'show']
-
-// טופס הוספה לבילוי / מתכון / מוצר / אמן / הופעה — עם התמונה שהועלתה והצעות מהזיהוי
-export default function SimpleForm({ type, init, imageUrl, titleSuggestions, onSave, busy }) {
+// טופס הוספה: 'note' הוא הטופס הגנרי לכל קטגוריה רגילה (בילויים/מתכונים/מוצרים/שונות/...),
+// 'artist' ו-'show' נשארים טפסים ייעודיים תחת קטגוריית הופעות חיות.
+// עם התמונה שהועלתה והצעות שם מתוך הזיהוי.
+export default function SimpleForm({ type, categoryId, categoryLabel, init, imageUrl, titleSuggestions, onSave, busy }) {
   const [f, setF] = useState({
     title: init?.title || '',
-    address: init?.address || '',
-    region: init?.region || null,
-    placeTypes: init?.placeTypes || [],
-    audiences: init?.audiences || [],
-    dishType: init?.dishType || null,
-    kashrut: init?.kashrut || null,
+    kind: init?.kind || '',
     tags: init?.tags || [],
+    address: init?.address || '',
     price: init?.price || '',
     store: init?.store || '',
-    buyUrl: init?.buyUrl || '',
-    productCategory: init?.productCategory || null,
+    link: init?.link || '',
     genres: init?.genres || [],
     creator: init?.creator || '',
     showType: init?.showType || null,
@@ -113,44 +99,43 @@ export default function SimpleForm({ type, init, imageUrl, titleSuggestions, onS
       return
     }
     setError(null)
-    onSave({
-      type,
+    const base = {
       titleHe: f.title.trim(),
-      address: f.address.trim(),
-      mapsUrl:
-        HAS_ADDRESS.includes(type) && f.title ? mapsSearchUrl(`${f.title} ${f.address}`.trim()) : '',
-      region: f.region,
-      placeTypes: f.placeTypes,
-      audiences: f.audiences,
-      dishType: f.dishType,
-      kashrut: f.kashrut,
-      tags: f.tags,
-      price: parseFloat(String(f.price).replace(',', '.')) || null,
-      store: f.store.trim(),
-      buyUrl: f.buyUrl.trim(),
-      productCategory: f.productCategory,
+      myNote: f.note.trim(),
+      sourceText: init?.sourceText || '',
+      identification: init?.fromAi ? 'auto' : 'manual',
+      availability: [],
+    }
+    if (type === 'note') {
+      onSave({
+        ...base,
+        type: 'note',
+        categoryId,
+        kind: f.kind.trim(),
+        tags: f.tags,
+        address: f.address.trim(),
+        mapsUrl: f.title ? mapsSearchUrl(`${f.title} ${f.address}`.trim()) : '',
+        price: parseFloat(String(f.price).replace(',', '.')) || null,
+        store: f.store.trim(),
+        link: f.link.trim(),
+      })
+      return
+    }
+    onSave({
+      ...base,
+      type,
       genres: type === 'artist' ? f.genres : [],
       creator: type === 'show' ? f.creator.trim() : '',
       showType: f.showType,
       eventDate: f.eventDate,
       eventTime: f.eventTime,
+      price: parseFloat(String(f.price).replace(',', '.')) || null,
       ticketUrl: f.ticketUrl.trim(),
-      myNote: f.note.trim(),
-      sourceText: init?.sourceText || '',
-      status: 'רוצה',
-      myRating: 0,
-      identification: init?.fromAi ? 'auto' : 'manual',
-      availability: [],
     })
   }
 
-  const namePlaceholder = {
-    place: 'למשל: חוף הבונים',
-    recipe: 'למשל: פסטה ברוטב עגבניות',
-    product: 'למשל: מחבת גריל',
-    artist: 'למשל: נועה קירל',
-    show: 'למשל: הופעה של עידן רייכל',
-  }[type]
+  const namePlaceholder =
+    type === 'artist' ? 'למשל: נועה קירל' : type === 'show' ? 'למשל: הופעה של עידן רייכל' : 'שם ספציפי'
 
   return (
     <div className="space-y-3">
@@ -188,7 +173,12 @@ export default function SimpleForm({ type, init, imageUrl, titleSuggestions, onS
         </div>
       )}
 
-      <Field label={`שם ה${TYPE_LABEL[type]} *`} value={f.title} onChange={set('title')} placeholder={namePlaceholder} />
+      <Field
+        label={`שם ${type === 'note' ? categoryLabel || '' : ''} *`}
+        value={f.title}
+        onChange={set('title')}
+        placeholder={namePlaceholder}
+      />
 
       {type === 'show' && (
         <div className="grid grid-cols-2 gap-2">
@@ -201,10 +191,19 @@ export default function SimpleForm({ type, init, imageUrl, titleSuggestions, onS
         <Field label={CREATOR_LABEL.show} value={f.creator} onChange={set('creator')} placeholder="מי מופיע/ה?" />
       )}
 
-      {HAS_ADDRESS.includes(type) && (
+      {type === 'note' && (
+        <Field
+          label="סוג (למשל: קוסמטיקה, טבע ומסלולים, עיקרית…)"
+          value={f.kind}
+          onChange={set('kind')}
+          placeholder="אופציונלי — קטגוריה רחבה יותר"
+        />
+      )}
+
+      {(type === 'note' || type === 'show') && (
         <div>
           <label className="text-[11px] font-bold text-slate-400">
-            {type === 'show' ? 'מקום ההופעה' : 'כתובת / אזור'}
+            {type === 'show' ? 'מקום ההופעה' : 'כתובת (אופציונלי)'}
           </label>
           <div className="flex gap-2 mt-0.5">
             <input
@@ -254,36 +253,20 @@ export default function SimpleForm({ type, init, imageUrl, titleSuggestions, onS
         </div>
       )}
 
-      {type === 'place' && (
-        <>
-          <ToggleChips label="סוג הבילוי" options={PLACE_TYPES} selected={f.placeTypes} onToggle={toggleMulti('placeTypes')} />
-          <ToggleChips label="מתאים ל..." options={AUDIENCES} selected={f.audiences} onToggle={toggleMulti('audiences')} />
-          <ToggleChips label="אזור" options={REGIONS} selected={f.region} onToggle={toggleSingle('region')} single />
-        </>
-      )}
-
-      {type === 'recipe' && (
-        <>
-          <ToggleChips label="סוג המנה" options={DISH_TYPES} selected={f.dishType} onToggle={toggleSingle('dishType')} single />
-          <ToggleChips label="כשרות" options={KASHRUT} selected={f.kashrut} onToggle={toggleSingle('kashrut')} single />
-          <ToggleChips label="תגיות" options={RECIPE_TAGS} selected={f.tags} onToggle={toggleMulti('tags')} />
-        </>
-      )}
-
-      {type === 'product' && (
+      {type === 'note' && (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="מחיר (₪)" value={f.price} onChange={set('price')} type="number" />
-            <Field label="חנות / אתר" value={f.store} onChange={set('store')} />
+            <Field label="מחיר (₪, אופציונלי)" value={f.price} onChange={set('price')} type="number" />
+            <Field label="חנות / מקור" value={f.store} onChange={set('store')} />
           </div>
           <Field
-            label="קישור לקנייה (אופציונלי)"
-            value={f.buyUrl}
-            onChange={set('buyUrl')}
+            label="קישור (אופציונלי)"
+            value={f.link}
+            onChange={set('link')}
             placeholder="https://..."
             dir="ltr"
           />
-          <ToggleChips label="קטגוריה" options={PRODUCT_CATEGORIES} selected={f.productCategory} onToggle={toggleSingle('productCategory')} single />
+          <TagEditor tags={f.tags} onChange={(tags) => setF((s) => ({ ...s, tags }))} />
         </>
       )}
 
