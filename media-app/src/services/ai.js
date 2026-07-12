@@ -17,6 +17,53 @@ export class AiError extends Error {
   }
 }
 
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta'
+
+// תעבורת ה-AI. כברירת מחדל הבקשות עוברות דרך פונקציית Edge של Supabase שמחזיקה את מפתח
+// ה-Gemini בשרת (מובנה, משותף לכל המשתמשים המחוברים) — כך שאיש לא צריך להזין מפתח בעצמו.
+// אם משתמש בכל זאת הזין מפתח פרטי משלו, הבקשה יוצאת ישירות לגוגל עם המפתח הזה.
+let aiProxy = null // { supabase, functionsUrl, anonKey } | null
+export function setAiProxy(ctx) {
+  aiProxy = ctx
+}
+// האם הזיהוי החכם זמין בכלל — מפתח פרטי, פרוקסי מחשבון מחובר, או מצב הדגמה
+export function aiReady(ownKey) {
+  return DEMO || !!ownKey || !!aiProxy
+}
+
+// מבצע בקשת HTTP ל-Gemini ומחזיר Response רגיל — ישירות עם מפתח פרטי, או דרך הפרוקסי.
+// שני המסלולים מחזירים את אותו מבנה תשובה (ואת קוד הסטטוס המקורי), כך שכל לוגיקת
+// הניתוח/הניסיון-החוזר/הגילוי שמעל נשארת זהה בלי קשר לאיזה מסלול נבחר.
+async function geminiFetch(ownKey, path, init) {
+  if (ownKey) {
+    const sep = path.includes('?') ? '&' : '?'
+    return fetch(`${GEMINI_BASE}/${path}${sep}key=${encodeURIComponent(ownKey)}`, init)
+  }
+  if (!aiProxy) {
+    const e = new Error('no ai transport (not logged in and no key)')
+    e.status = 0
+    throw e
+  }
+  const {
+    data: { session },
+  } = await aiProxy.supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) {
+    const e = new Error('not authenticated')
+    e.status = 401
+    throw e
+  }
+  return fetch(aiProxy.functionsUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: aiProxy.anonKey,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ path, init: { method: init?.method || 'GET', body: init?.body || null } }),
+  })
+}
+
 async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinkingConfig) {
   const generationConfig = {
     temperature: 0.1,
@@ -27,14 +74,11 @@ async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinki
   // עצמה — במשימת חילוץ נתונים דטרמיניסטית זו לא נחוצה, ורק מסכנת תשובה ריקה.
   if (includeThinkingConfig) generationConfig.thinkingConfig = { thinkingBudget: 0 }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig }),
-    },
-  )
+  const res = await geminiFetch(apiKey, `models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }], generationConfig }),
+  })
   if (!res.ok) {
     let bodyText = ''
     try {
@@ -104,9 +148,7 @@ let discoveredModel = null
 // ובוחרים את הראשון שתומך ב-generateContent ("flash" עדיף, מהיר וזול).
 async function discoverModel(apiKey) {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-    )
+    const res = await geminiFetch(apiKey, 'models', undefined)
     if (!res.ok) return null
     const json = await res.json()
     const models = (json.models || []).filter((m) =>
@@ -150,10 +192,18 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
     }
   }
   const status = lastErr?.status
+  const usingProxy = !apiKey // בלי מפתח פרטי — הבקשה עברה דרך הפרוקסי המובנה
   let userMessage
-  if (status === 400) userMessage = 'המפתח לא תקין (בקשה שגויה) — ודאו שהעתקתם אותו במלואו'
+  if (status === 400)
+    userMessage = usingProxy
+      ? 'בקשה שגויה לשירות הזיהוי'
+      : 'המפתח לא תקין (בקשה שגויה) — ודאו שהעתקתם אותו במלואו'
   else if (status === 401 || status === 403)
-    userMessage = 'המפתח נדחה — ייתכן שהוא שגוי, לא הופעל, או שהמכסה החינמית נגמרה'
+    userMessage = usingProxy
+      ? 'החיבור לזיהוי נדחה — ייתכן שצריך להתחבר מחדש לחשבון, או שהזיהוי המובנה עדיין לא הותקן בשרת'
+      : 'המפתח נדחה — ייתכן שהוא שגוי, לא הופעל, או שהמכסה החינמית נגמרה'
+  else if (status === 404 && usingProxy)
+    userMessage = 'הזיהוי המובנה עדיין לא הותקן בשרת (פונקציית ה-Edge חסרה)'
   else if (status === 429) userMessage = 'חריגה ממכסת הבקשות החינמית לעת עתה — נסו שוב בעוד כמה דקות'
   else if (status) userMessage = `שגיאת שרת (${status})`
   else userMessage = 'לא הצלחתי להתחבר לשירות הזיהוי (בעיית רשת)'
@@ -171,7 +221,8 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
 // מוזרקת דינמית כדי שה-AI יזהה גם קטגוריות חדשות/משונות-שם, לא רק רשימה קבועה בקוד.
 export async function analyzeImage(file, apiKey, genericCategories = []) {
   if (DEMO) return demoAnalyze()
-  if (!apiKey) throw new AiError('לא הוזן מפתח AI', 'no key')
+  if (!apiKey && !aiProxy)
+    throw new AiError('הזיהוי החכם עוד לא מוכן — התחברו לחשבון כדי להפעיל אותו', 'no key & no proxy')
 
   const blob = await resizeImage(file, 1024, 0.8)
   const base64 = await blobToBase64(blob)
@@ -207,7 +258,7 @@ export async function analyzeImage(file, apiKey, genericCategories = []) {
 
 // השלמת שדות חסרים בלבד עבור ספר/סרט/סדרה, אחרי שהמקורות הרשמיים לא סיפקו הכול
 export async function aiCompleteDetails(candidate, apiKey) {
-  if (DEMO || !apiKey) return candidate
+  if (DEMO || (!apiKey && !aiProxy)) return candidate
   if (!['book', 'movie', 'series'].includes(candidate.type)) return candidate
 
   const missing = []
@@ -250,7 +301,8 @@ export async function aiCompleteDetails(candidate, apiKey) {
 // בדיקת תקינות מהירה של המפתח, ללא תמונה — למסך ההגדרות
 export async function testAiKey(apiKey) {
   if (DEMO) return true
-  if (!apiKey) throw new AiError('לא הוזן מפתח', 'no key')
+  if (!apiKey && !aiProxy)
+    throw new AiError('התחברו לחשבון או הזינו מפתח כדי לבדוק את החיבור', 'no key & no proxy')
   const result = await geminiJson(apiKey, [{ text: 'החזר JSON בדיוק כך: {"ok":true}' }])
   if (!result?.ok) throw new AiError('תשובה לא צפויה מהשירות', JSON.stringify(result))
   return true

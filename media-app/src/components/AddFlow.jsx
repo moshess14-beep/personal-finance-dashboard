@@ -67,15 +67,19 @@ function titleScore(line, title) {
 export default function AddFlow({ mode, file, category = null, onClose, onSaved }) {
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const aiKey = useLibraryStore((s) => s.aiKey)
+  const authUser = useLibraryStore((s) => s.authUser)
   const addItem = useLibraryStore((s) => s.addItem)
   const categories = useLibraryStore((s) => s.categories)
+
+  // הזיהוי החכם זמין אם יש מפתח פרטי, או שמחוברים לחשבון (ואז הוא רץ דרך הפרוקסי המובנה)
+  const canAi = DEMO || !!aiKey || !!authUser
 
   const forcedCategory = category ? categories.find((c) => c.id === category) : null
   const forcedGeneric = forcedCategory && !forcedCategory.builtin ? forcedCategory : null
   const forcedLive = forcedCategory?.id === 'live'
 
   const [step, setStep] = useState(() => {
-    if (mode === 'image') return aiKey || DEMO ? 'analyze' : 'ocr'
+    if (mode === 'image') return canAi ? 'analyze' : 'ocr'
     if (forcedGeneric) return 'simple'
     if (forcedLive) return 'liveChoice'
     if (forcedCategory) return 'query' // ספרים/צפייה — לחיפוש ישיר
@@ -104,9 +108,9 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
     let cancelled = false
 
     async function pipeline() {
-      // שלב 1: ניתוח עם AI (אם יש מפתח) — מזהה קטגוריה ופרטים בבת אחת
+      // שלב 1: ניתוח עם AI (מפתח פרטי או פרוקסי מחשבון מחובר) — מזהה קטגוריה ופרטים בבת אחת
       let aiFailure = null
-      if (aiKey || DEMO) {
+      if (canAi) {
         setStep('analyze')
         try {
           const genericCats = categories.filter((c) => !c.builtin).map((c) => ({ id: c.id, label: c.label }))

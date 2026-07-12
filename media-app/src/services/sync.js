@@ -3,6 +3,7 @@
 import { getSupabase } from './supabase'
 import useLibraryStore, { setSyncHooks } from '../store/useLibraryStore'
 import { setImageCloudContext, migrateLocalImageToCloud } from './images'
+import { setAiProxy } from './ai'
 
 let channel = null
 let connectedUserId = null
@@ -43,6 +44,7 @@ async function handleSession(supabase, session) {
   try {
     await pullAndMerge(supabase, user.id)
     setImageCloudContext({ supabase, userId: user.id })
+    enableAiProxy(supabase)
     installHooks(supabase, user.id)
     setupRealtime(supabase, user.id)
     useLibraryStore.setState({ syncStatus: 'synced' })
@@ -89,6 +91,18 @@ async function pullAndMerge(supabase, userId) {
   await supabase
     .from('settings')
     .upsert({ user_id: userId, data: mergedSettings, updated_at: new Date().toISOString() })
+}
+
+// מפעיל את הזיהוי החכם המובנה: מכאן ואילך קריאות ה-AI עוברות דרך פונקציית ה-Edge
+// של הפרויקט (שמחזיקה את מפתח ה-Gemini בשרת), כך שאין צורך להזין מפתח בכל מכשיר.
+function enableAiProxy(supabase) {
+  const { supabaseUrl, supabaseAnonKey } = useLibraryStore.getState()
+  if (!supabaseUrl) return
+  setAiProxy({
+    supabase,
+    functionsUrl: `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/gemini`,
+    anonKey: supabaseAnonKey,
+  })
 }
 
 function installHooks(supabase, userId) {
@@ -160,6 +174,7 @@ function teardown() {
   connectedUserId = null
   setSyncHooks(null)
   setImageCloudContext(null)
+  setAiProxy(null)
 }
 
 export async function signUp(email, password) {
