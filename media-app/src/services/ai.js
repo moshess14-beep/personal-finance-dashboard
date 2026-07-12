@@ -17,20 +17,22 @@ export class AiError extends Error {
   }
 }
 
-async function callModel(model, apiKey, parts, maxOutputTokens) {
+async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinkingConfig) {
+  const generationConfig = {
+    temperature: 0.1,
+    maxOutputTokens,
+    responseMimeType: 'application/json',
+  }
+  // דגמי 2.5 מפעילים ברירת מחדל "חשיבה" שצורכת חלק ניכר ממכסת הטוקנים לפני התשובה
+  // עצמה — במשימת חילוץ נתונים דטרמיניסטית זו לא נחוצה, ורק מסכנת תשובה ריקה.
+  if (includeThinkingConfig) generationConfig.thinkingConfig = { thinkingBudget: 0 }
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens,
-          responseMimeType: 'application/json',
-        },
-      }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig }),
     },
   )
   if (!res.ok) {
@@ -52,6 +54,7 @@ async function callModel(model, apiKey, parts, maxOutputTokens) {
   if (!text) {
     const err = new Error(`empty response (finishReason: ${finishReason || 'none'})`)
     err.finishReason = finishReason
+    err.emptyResponse = true
     throw err
   }
   try {
@@ -60,6 +63,19 @@ async function callModel(model, apiKey, parts, maxOutputTokens) {
     const err = new Error('bad json in response')
     err.bodyText = text.slice(0, 300)
     throw err
+  }
+}
+
+async function callModel(model, apiKey, parts, maxOutputTokens) {
+  try {
+    return await callModelRaw(model, apiKey, parts, maxOutputTokens, true)
+  } catch (e) {
+    // אם השדה thinkingConfig עצמו נדחה (400) או שהתשובה עדיין יצאה ריקה —
+    // ניסיון נוסף על אותו מודל בלי הגבלת החשיבה, עם מכסת טוקנים גדולה יותר
+    if (e.status === 400 || e.emptyResponse) {
+      return await callModelRaw(model, apiKey, parts, Math.max(maxOutputTokens, 500), false)
+    }
+    throw e
   }
 }
 
