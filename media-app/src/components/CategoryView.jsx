@@ -1,10 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import ItemCard from './ItemCard'
-import { CATEGORY_BY_ID } from '../data/constants'
 
-export default function CategoryView({ view, items, totalCount, onBack, onOpenItem }) {
-  const category = CATEGORY_BY_ID[view]
-
+export default function CategoryView({ category, items, totalCount, onBack, onOpenItem }) {
   return (
     <div className="mt-4">
       <div className="flex items-center gap-1.5 px-1">
@@ -17,7 +14,7 @@ export default function CategoryView({ view, items, totalCount, onBack, onOpenIt
         </button>
         <span className="text-lg">{category.emoji}</span>
         <h2 className="font-black text-lg text-slate-800">{category.label}</h2>
-        <span className="text-xs text-slate-400 font-semibold">{category.sub}</span>
+        {category.sub && <span className="text-xs text-slate-400 font-semibold">{category.sub}</span>}
         <span className="text-sm text-slate-400 font-bold ms-auto">({items.length})</span>
       </div>
 

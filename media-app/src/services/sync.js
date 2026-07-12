@@ -52,7 +52,7 @@ async function handleSession(supabase, session) {
 }
 
 async function pullAndMerge(supabase, userId) {
-  const { items: localItems, aiKey, tmdbKey } = useLibraryStore.getState()
+  const { items: localItems, aiKey, tmdbKey, categories } = useLibraryStore.getState()
 
   const [itemsRes, settingsRes] = await Promise.all([
     supabase.from('items').select('id,data').eq('user_id', userId),
@@ -83,6 +83,7 @@ async function pullAndMerge(supabase, userId) {
   const mergedSettings = {
     aiKey: remoteSettings.aiKey || aiKey || '',
     tmdbKey: remoteSettings.tmdbKey || tmdbKey || '',
+    categories: remoteSettings.categories?.length ? remoteSettings.categories : categories,
   }
   useLibraryStore.setState(mergedSettings)
   await supabase

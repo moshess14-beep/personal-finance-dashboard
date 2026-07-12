@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, ListTree } from 'lucide-react'
 import useLibraryStore from './store/useLibraryStore'
 import Header from './components/Header'
 import AddBar from './components/AddBar'
@@ -9,34 +9,27 @@ import FiltersBar from './components/FiltersBar'
 import AddFlow from './components/AddFlow'
 import ItemDetail from './components/ItemDetail'
 import SettingsModal from './components/SettingsModal'
+import CategoryManagerModal from './components/CategoryManagerModal'
 import Modal from './components/Modal'
 import { DEMO } from './services/env'
 import { consumeSharedImage } from './services/shareTarget'
 import { connectSync } from './services/sync'
-import { CATEGORY_BY_ID } from './data/constants'
 
 // התאמת פריט לערך סינון, לפי מפתח הפילטר
 const MATCHERS = {
   type: (it, v) => v === 'all' || it.type === v,
   genre: (it, v) => (it.genres || []).includes(v),
   platform: (it, v) => (it.availability || []).some((a) => a.platform === v),
-  placeType: (it, v) => (it.placeTypes || []).includes(v),
-  audience: (it, v) => (it.audiences || []).includes(v),
-  region: (it, v) => it.region === v,
-  dishType: (it, v) => it.dishType === v,
-  kashrut: (it, v) => it.kashrut === v,
-  tag: (it, v) => (it.tags || []).includes(v),
-  productCategory: (it, v) => it.productCategory === v,
   showType: (it, v) => it.showType === v,
+  kind: (it, v) => it.kind === v,
+  tag: (it, v) => (it.tags || []).includes(v),
 }
 
-function sortItems(items, sort) {
+function sortByMode(items, sort) {
   const arr = [...items]
   switch (sort) {
     case 'title':
       return arr.sort((a, b) => (a.titleHe || '').localeCompare(b.titleHe || '', 'he'))
-    case 'rating':
-      return arr.sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
     case 'date': {
       // הופעות קרובות קודם (הקרובה ביותר ראשונה), אחריהן הופעות שעברו (האחרונה ראשונה),
       // ובסוף פריטים בלי תאריך (אמנים), לפי החדש ביותר
@@ -56,10 +49,19 @@ function sortItems(items, sort) {
   }
 }
 
+// פריטים שסומנו כבוצעו יורדים תמיד לסוף הרשימה (בכל מיון), כדי שהמסך יתמקד במה שעוד לפני
+function sortItems(items, sort) {
+  const active = items.filter((it) => !it.completed)
+  const done = items.filter((it) => it.completed)
+  return [...sortByMode(active, sort), ...sortByMode(done, sort)]
+}
+
 export default function App() {
   const items = useLibraryStore((s) => s.items)
+  const categories = useLibraryStore((s) => s.categories)
   const seeded = useLibraryStore((s) => s.seeded)
   const seedDemo = useLibraryStore((s) => s.seedDemo)
+  const migrateLegacyItems = useLibraryStore((s) => s.migrateLegacyItems)
 
   const [view, setView] = useState(null) // null (מסך פתיחה) | מזהה קטגוריה
   const [filters, setFilters] = useState({})
@@ -68,9 +70,11 @@ export default function App() {
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [openItemId, setOpenItemId] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
+    migrateLegacyItems()
     if (DEMO && !seeded && items.length === 0) seedDemo()
     if (!DEMO) connectSync()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,10 +90,13 @@ export default function App() {
     })
   }, [])
 
-  const category = view ? CATEGORY_BY_ID[view] : null
+  const category = view ? categories.find((c) => c.id === view) : null
 
   const categoryItems = useMemo(
-    () => (category ? items.filter((it) => category.types.includes(it.type)) : []),
+    () =>
+      category
+        ? items.filter((it) => (category.builtin ? category.types.includes(it.type) : it.categoryId === category.id))
+        : [],
     [items, category],
   )
 
@@ -136,11 +143,20 @@ export default function App() {
               onImage={(file) => startAdd({ mode: 'image', file, category: null })}
               onName={() => startAdd({ mode: 'name', category: null })}
             />
-            <HomeTiles items={items} onOpen={openCategory} />
+            <div className="flex justify-end mt-3">
+              <button
+                onClick={() => setShowCategoryManager(true)}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5"
+              >
+                <ListTree className="w-3.5 h-3.5" />
+                ניהול קטגוריות
+              </button>
+            </div>
+            <HomeTiles categories={categories} items={items} onOpen={openCategory} />
           </>
         ) : (
           <CategoryView
-            view={view}
+            category={category}
             items={sorted}
             totalCount={categoryItems.length}
             onBack={() => setView(null)}
@@ -152,7 +168,7 @@ export default function App() {
       {view !== null && (
         <>
           <FiltersBar
-            mode={view}
+            category={category}
             items={categoryItems}
             filters={filters}
             setFilters={setFilters}
@@ -194,6 +210,7 @@ export default function App() {
       )}
       {openItem && <ItemDetail item={openItem} onClose={() => setOpenItemId(null)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showCategoryManager && <CategoryManagerModal onClose={() => setShowCategoryManager(false)} />}
 
       {toast && (
         <div className="fixed bottom-40 inset-x-0 flex justify-center z-50 pointer-events-none">

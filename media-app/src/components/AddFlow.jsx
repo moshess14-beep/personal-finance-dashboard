@@ -20,11 +20,11 @@ const STEP_TITLE = {
   confirm: 'בדיקת הפרטים לפני שמירה',
   simple: 'פרטי ההמלצה',
   liveChoice: 'אמן או הופעה?',
+  categoryChoice: 'לאיזו קטגוריה?',
 }
 
-// קטגוריה → סוג פריט של הטופס הפשוט
-const SIMPLE_TYPE = { places: 'place', recipes: 'recipe', products: 'product' }
-const SIMPLE_TYPES = ['place', 'recipe', 'product']
+// מיפוי סיווג גס שה-AI מחזיר לקטגוריות ברירת המחדל, לפי מזהה (עמיד לשינוי שם התווית)
+const GENERIC_SEED_MAP = { place: 'places', recipe: 'recipes', product: 'products', misc: 'misc' }
 const LIVE_TYPES = ['artist', 'show']
 
 function candidateToForm(c, identification) {
@@ -68,15 +68,18 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const aiKey = useLibraryStore((s) => s.aiKey)
   const addItem = useLibraryStore((s) => s.addItem)
+  const categories = useLibraryStore((s) => s.categories)
 
-  const simpleHint = SIMPLE_TYPE[category] || null
-  const categoryIsLive = category === 'live'
+  const forcedCategory = category ? categories.find((c) => c.id === category) : null
+  const forcedGeneric = forcedCategory && !forcedCategory.builtin ? forcedCategory : null
+  const forcedLive = forcedCategory?.id === 'live'
 
   const [step, setStep] = useState(() => {
     if (mode === 'image') return aiKey || DEMO ? 'analyze' : 'ocr'
-    if (simpleHint) return 'simple'
-    if (categoryIsLive) return 'liveChoice'
-    return 'query'
+    if (forcedGeneric) return 'simple'
+    if (forcedLive) return 'liveChoice'
+    if (forcedCategory) return 'query' // ספרים/צפייה — לחיפוש ישיר
+    return 'categoryChoice' // נפתח מהמסך הראשי, בלי הקשר — קודם בוחרים קטגוריה
   })
   const [imageUrl, setImageUrl] = useState(null)
   const [ocrProgress, setOcrProgress] = useState(0)
@@ -90,7 +93,9 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
   const [error, setError] = useState(null)
   const [results, setResults] = useState(null)
   const [form, setForm] = useState(null)
-  const [simple, setSimple] = useState(simpleHint ? { type: simpleHint, init: {} } : null)
+  const [simple, setSimple] = useState(
+    forcedGeneric ? { type: 'note', categoryId: forcedGeneric.id, categoryLabel: forcedGeneric.label, init: {} } : null,
+  )
 
   useEffect(() => {
     if (mode !== 'image' || !file) return
@@ -126,18 +131,18 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
     function routeAnalysis(info) {
       const title = (info.title || '').trim()
       const cat = info.category
-      // אם נפתח מתוך קטגוריה של טופס פשוט — תמיד לשם
-      if (simpleHint) {
-        openSimple(simpleHint, info, title)
+      // אם נפתח מתוך קטגוריה גנרית קבועה — תמיד לשם
+      if (forcedGeneric) {
+        openGenericWithInfo(forcedGeneric, info, title)
         return true
       }
       // ה-AI זיהה בבירור אמן או הופעה — פותחים ישר, בלי לשאול
       if (LIVE_TYPES.includes(cat) && title) {
-        openSimple(cat, info, title)
+        openLiveWithInfo(cat, info, title)
         return true
       }
       // נפתח מתוך קטגוריית הופעות חיות אבל ה-AI לא הכריע בין אמן להופעה
-      if (categoryIsLive) {
+      if (forcedLive) {
         setStep('liveChoice')
         return true
       }
@@ -147,16 +152,25 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
         doSearch(title, info.altTitle)
         return true
       }
-      if (SIMPLE_TYPES.includes(cat) && title) {
-        openSimple(cat, info, title)
+      const seedId = GENERIC_SEED_MAP[cat]
+      const target = seedId && categories.find((c) => c.id === seedId)
+      if (target && title) {
+        openGenericWithInfo(target, info, title)
         return true
       }
-      return false // unknown — ניפול ל-OCR
+      return false // unknown, או שהקטגוריה שזוהתה נמחקה — ניפול ל-OCR/בחירה ידנית
     }
 
-    function openSimple(type, info, title) {
+    function openLiveWithInfo(type, info, title) {
+      setSimple({ type, init: { title: title || '', sourceText: info?.rawText || '', fromAi: !!info } })
+      setStep('simple')
+    }
+
+    function openGenericWithInfo(cat, info, title) {
       setSimple({
-        type,
+        type: 'note',
+        categoryId: cat.id,
+        categoryLabel: cat.label,
         init: {
           title: title || '',
           address: info?.address || '',
@@ -178,17 +192,22 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
         setOcrText(text)
         const lines = pickCandidateLines(text)
         setOcrLines(lines)
-        if (simpleHint) {
-          setSimple({ type: simpleHint, init: { sourceText: text, price: guessPrice(text) } })
+        if (forcedGeneric) {
+          setSimple({
+            type: 'note',
+            categoryId: forcedGeneric.id,
+            categoryLabel: forcedGeneric.label,
+            init: { sourceText: text, price: guessPrice(text) },
+          })
           setStep('simple')
           return
         }
-        if (categoryIsLive) {
+        if (forcedLive) {
           setStep('liveChoice')
           return
         }
         if (lines.length === 0) {
-          setError(withNote('לא זוהה טקסט ברור בתמונה — אפשר להקליד את השם ידנית'))
+          setError(withNote('לא זוהה טקסט ברור בתמונה — אפשר להקליד את השם ידנית, או לבחור קטגוריה ידנית למטה'))
           return
         }
         setAutoSearching(true)
@@ -201,7 +220,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
             setStep('results')
             if (aiNote) setError(aiNote)
           } else {
-            setError(withNote('לא זיהיתי לבד — בחרו את השורה שהיא שם היצירה, או תקנו ידנית'))
+            setError(withNote('לא זיהיתי לבד — בחרו שורה, הקלידו שם, או בחרו קטגוריה אחרת למטה'))
           }
         } catch {
           if (!isCancelled()) setError(withNote('החיפוש ברשת נכשל — בחרו שורה או הקלידו את השם'))
@@ -293,23 +312,62 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
     setStep('confirm')
   }
 
-  function goSimple(type) {
+  // בחירת אמן/הופעה מתוך liveChoice, עם מה שכבר ידוע (שם/תמונה)
+  function chooseLiveType(type) {
     setSimple({
       type,
       init: {
         title: query || aiInfo?.title || '',
         sourceText: ocrText || aiInfo?.rawText || '',
-        price: guessPrice(ocrText) || aiInfo?.price || '',
         fromAi: !!aiInfo,
       },
     })
     setStep('simple')
   }
 
-  function save() {
+  // בחירת קטגוריה חופשית מתוך categoryChoice (או שינוי דעה מכל שלב אחר)
+  function routeToCategory(cat) {
+    if (cat.builtin && (cat.types.includes('book') || cat.types.includes('movie'))) {
+      const guess = (aiInfo?.title || query || '').trim()
+      if (guess) doSearch(guess, aiInfo?.altTitle)
+      else setStep('query')
+      return
+    }
+    if (cat.id === 'live') {
+      setStep('liveChoice')
+      return
+    }
+    setSimple({
+      type: 'note',
+      categoryId: cat.id,
+      categoryLabel: cat.label,
+      init: {
+        title: (query || aiInfo?.title || '').trim(),
+        address: aiInfo?.address || '',
+        price: aiInfo?.price || guessPrice(ocrText) || '',
+        store: aiInfo?.store || '',
+        sourceText: aiInfo?.rawText || ocrText || '',
+        fromAi: !!aiInfo,
+      },
+    })
+    setStep('simple')
+  }
+
+  async function save() {
     if (!form.titleHe.trim()) {
       setError('חסר שם — זה השדה היחיד שחובה למלא')
       return
+    }
+    setBusy(true)
+    let imageId = null
+    try {
+      if (file) {
+        imageId = crypto.randomUUID()
+        const resized = await resizeImage(file)
+        await saveImage(imageId, resized)
+      }
+    } catch {
+      // כישלון שמירת התמונה לא חוסם שמירת הפריט עצמו
     }
     addItem({
       type: form.type,
@@ -329,10 +387,10 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       identification: form.identification,
       source: form.source,
       externalId: form.externalId,
-      status: 'רוצה',
-      myRating: 0,
+      imageId,
       myNote: '',
     })
+    setBusy(false)
     onSaved()
   }
 
@@ -355,27 +413,14 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
 
   const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const saveAsChips = !simpleHint && !categoryIsLive && (
-    <div className="pt-1">
-      <div className="text-[11px] font-bold text-slate-400 mb-1.5">זו בכלל המלצה אחרת? שמרו כ:</div>
-      <div className="grid grid-cols-2 gap-1.5">
-        {SIMPLE_TYPES.map((t) => (
-          <button
-            key={t}
-            onClick={() => goSimple(t)}
-            className="text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2"
-          >
-            {{ place: '🌄 בילוי', recipe: '🍳 מתכון', product: '🛍️ מוצר' }[t]}
-          </button>
-        ))}
-        <button
-          onClick={() => setStep('liveChoice')}
-          className="text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2"
-        >
-          🎤 הופעה חיה
-        </button>
-      </div>
-    </div>
+  // אם לא נפתחנו מתוך קטגוריה קבועה (גנרית או הופעות חיות) — תמיד אפשר לשנות דעה
+  const categoryEscape = !forcedGeneric && !forcedLive && (
+    <button
+      onClick={() => setStep('categoryChoice')}
+      className="w-full text-xs font-bold text-slate-500 bg-slate-100 rounded-xl py-2.5"
+    >
+      זו בכלל קטגוריה אחרת? בחירה מהרשימה
+    </button>
   )
 
   return (
@@ -398,6 +443,33 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           <div className="flex items-center gap-2 text-sm text-teal-700 font-semibold">
             <Sparkles className="w-4 h-4 animate-pulse" />
             מזהה את התמונה: מה זה, איזו קטגוריה, ואילו פרטים…
+          </div>
+        </div>
+      )}
+
+      {step === 'categoryChoice' && (
+        <div className="space-y-3">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              className="w-full max-h-40 object-contain rounded-xl bg-slate-100"
+              alt="התמונה שהועלתה"
+            />
+          )}
+          <p className="text-sm text-slate-500">לאיזו קטגוריה שייכת ההמלצה?</p>
+          <div className="grid grid-cols-3 gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => routeToCategory(cat)}
+                className="flex flex-col items-center gap-1 bg-slate-50 border border-slate-200 rounded-2xl py-3"
+              >
+                <span className="text-2xl">{cat.emoji}</span>
+                <span className="text-[11px] font-bold text-slate-700 text-center leading-tight">
+                  {cat.label}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -460,7 +532,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
                 busy={busy}
                 placeholder="או הקלידו/תקנו את השם כאן"
               />
-              {saveAsChips}
+              {categoryEscape}
             </>
           )}
         </div>
@@ -479,7 +551,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           <p className="text-[11px] text-slate-400 leading-relaxed">
             מספיק שם בלבד — נזהה אם זה ספר, סרט או סדרה ונשלים את שאר הפרטים אוטומטית.
           </p>
-          {saveAsChips}
+          {categoryEscape}
         </div>
       )}
 
@@ -538,7 +610,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
               הזנה ידנית
             </button>
           </div>
-          {saveAsChips}
+          {categoryEscape}
         </div>
       )}
 
@@ -633,8 +705,10 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
 
           <button
             onClick={save}
-            className="w-full bg-teal-700 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition"
+            disabled={busy}
+            className="w-full bg-teal-700 disabled:bg-slate-300 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition flex items-center justify-center gap-2"
           >
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             שמירה בספרייה
           </button>
         </div>
@@ -652,7 +726,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           <p className="text-sm text-slate-500">איזה סוג המלצה זו?</p>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => goSimple('artist')}
+              onClick={() => chooseLiveType('artist')}
               className="bg-slate-50 border border-slate-200 rounded-2xl py-5 flex flex-col items-center gap-1.5 font-bold text-slate-700"
             >
               <span className="text-2xl">🎤</span>
@@ -660,7 +734,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
               <span className="text-[10px] font-normal text-slate-400">המלצה לגילוי, בלי תאריך</span>
             </button>
             <button
-              onClick={() => goSimple('show')}
+              onClick={() => chooseLiveType('show')}
               className="bg-slate-50 border border-slate-200 rounded-2xl py-5 flex flex-col items-center gap-1.5 font-bold text-slate-700"
             >
               <span className="text-2xl">🎫</span>
@@ -674,6 +748,8 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       {step === 'simple' && simple && (
         <SimpleForm
           type={simple.type}
+          categoryId={simple.categoryId}
+          categoryLabel={simple.categoryLabel}
           init={simple.init}
           imageUrl={imageUrl}
           titleSuggestions={ocrLines || []}

@@ -1,32 +1,30 @@
 import { useState } from 'react'
-import { Star, Trash2, RefreshCw, Loader2, MapPin, ExternalLink, Ticket, Music } from 'lucide-react'
+import {
+  Trash2,
+  RefreshCw,
+  Loader2,
+  MapPin,
+  ExternalLink,
+  Ticket,
+  Music,
+  Check,
+  ThumbsUp,
+  ThumbsDown,
+  Undo2,
+} from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
+import TagEditor from './TagEditor'
+import ImageGallery from './ImageGallery'
 import useLibraryStore from '../store/useLibraryStore'
 import { fetchAvailability } from '../services/search'
-import { useItemImage, deleteImage } from '../services/images'
+import { useItemImage, deleteImage, saveImage, resizeImage } from '../services/images'
 import { mapsSearchUrl } from '../services/places'
 import { youtubeSearchUrl, spotifySearchUrl, googleSearchUrl } from '../services/links'
 import { daysUntilLabel, formatEventDate } from '../utils/dates'
-import {
-  STATUSES,
-  TYPE_LABEL,
-  TYPE_BADGE_STYLE,
-  CREATOR_LABEL,
-  statusLabel,
-} from '../data/constants'
+import { TYPE_LABEL, TYPE_BADGE_STYLE, CREATOR_LABEL, DONE_VERB } from '../data/constants'
 import { PLATFORMS, PLATFORM_BY_ID } from '../data/platforms'
-import {
-  PLACE_TYPES,
-  AUDIENCES,
-  REGIONS,
-  DISH_TYPES,
-  KASHRUT,
-  RECIPE_TAGS,
-  PRODUCT_CATEGORIES,
-  MUSIC_GENRES,
-  SHOW_TYPES,
-} from '../data/taxonomies'
+import { MUSIC_GENRES, SHOW_TYPES } from '../data/taxonomies'
 
 function ToggleChips({ label, options, selected, onToggle, single }) {
   const isSelected = (opt) => (single ? selected === opt : (selected || []).includes(opt))
@@ -52,21 +50,24 @@ function ToggleChips({ label, options, selected, onToggle, single }) {
   )
 }
 
-const HAS_ADDRESS = ['place', 'show']
-
 export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
   const removeItem = useLibraryStore((s) => s.removeItem)
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
+  const categories = useLibraryStore((s) => s.categories)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState(item.myNote || '')
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState(null)
+  const [galleryBusy, setGalleryBusy] = useState(false)
 
   const isScreen = item.type === 'movie' || item.type === 'series'
+  const isNote = item.type === 'note'
+  const category = isNote ? categories.find((c) => c.id === item.categoryId) : null
   const availability = item.availability || []
   const storedImage = useItemImage(item.imageId)
   const dateBadge = item.type === 'show' ? daysUntilLabel(item.eventDate) : null
+  const showsAddress = item.type === 'show' || isNote
 
   const toggleMulti = (key) => (opt) => {
     const current = item[key] || []
@@ -106,6 +107,24 @@ export default function ItemDetail({ item, onClose }) {
     })
   }
 
+  async function addGalleryImage(file) {
+    setGalleryBusy(true)
+    try {
+      const id = crypto.randomUUID()
+      const resized = await resizeImage(file)
+      await saveImage(id, resized)
+      updateItem(item.id, { extraImageIds: [...(item.extraImageIds || []), id] })
+    } catch {
+      // כשל בהעלאת תמונה נוספת לא אמור לחסום שימוש בשאר המסך
+    }
+    setGalleryBusy(false)
+  }
+
+  function removeGalleryImage(id) {
+    deleteImage(id)
+    updateItem(item.id, { extraImageIds: (item.extraImageIds || []).filter((x) => x !== id) })
+  }
+
   const metaParts = [
     item.year,
     item.type === 'book' && item.pages ? `${item.pages} עמ'` : null,
@@ -114,27 +133,29 @@ export default function ItemDetail({ item, onClose }) {
     item.type === 'series' && item.episodeRuntimeMinutes
       ? `כ־${item.episodeRuntimeMinutes} דק' לפרק`
       : null,
-    item.type === 'product' && item.price ? `₪${item.price}` : null,
-    item.type === 'product' && item.store ? item.store : null,
     item.type === 'show' && item.showType ? item.showType : null,
     item.type === 'show' && item.price ? `₪${item.price} לכרטיס` : null,
+    isNote && item.price ? `₪${item.price}` : null,
+    isNote && item.store ? item.store : null,
   ].filter(Boolean)
 
   const mapsHref =
-    HAS_ADDRESS.includes(item.type) && (item.address || item.mapsUrl)
+    showsAddress && (item.address || item.mapsUrl)
       ? item.mapsUrl || mapsSearchUrl(`${item.titleHe} ${item.address || ''}`.trim())
       : null
+
+  const doneVerb = DONE_VERB[item.type] || 'בוצע'
 
   return (
     <Modal title="פרטי ההמלצה" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex gap-3">
-          <Cover item={item} className="w-24 aspect-[2/3] rounded-xl shrink-0" />
+          <Cover item={item} category={category} className="w-24 aspect-[2/3] rounded-xl shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="font-black text-lg text-slate-800 leading-tight">{item.titleHe}</h3>
               <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${TYPE_BADGE_STYLE[item.type]}`}>
-                {TYPE_LABEL[item.type]}
+                {isNote ? category?.label || TYPE_LABEL.note : TYPE_LABEL[item.type]}
               </span>
             </div>
             {item.titleOriginal && (
@@ -148,6 +169,7 @@ export default function ItemDetail({ item, onClose }) {
                 {item.creator}
               </div>
             )}
+            {isNote && item.kind && <div className="text-sm text-slate-600 mt-1">{item.kind}</div>}
             {dateBadge && (
               <div className="text-xs font-bold text-teal-700 mt-1">
                 {formatEventDate(item.eventDate)}
@@ -157,7 +179,7 @@ export default function ItemDetail({ item, onClose }) {
             {metaParts.length > 0 && (
               <div className="text-xs text-slate-500 mt-1">{metaParts.join(' · ')}</div>
             )}
-            {HAS_ADDRESS.includes(item.type) && item.address && (
+            {showsAddress && item.address && (
               <div className="text-xs text-slate-500 mt-1 flex items-start gap-1">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
                 <span className="line-clamp-2">{item.address}</span>
@@ -180,7 +202,7 @@ export default function ItemDetail({ item, onClose }) {
           </div>
         </div>
 
-        {(item.type === 'place' || item.type === 'product' || item.type === 'show') && (
+        {(showsAddress || item.type === 'show' || (isNote && item.link)) && (
           <div className="flex gap-2">
             {mapsHref && (
               <a
@@ -193,15 +215,15 @@ export default function ItemDetail({ item, onClose }) {
                 פתיחה במפות
               </a>
             )}
-            {item.type === 'product' && item.buyUrl && (
+            {isNote && item.link && (
               <a
-                href={item.buyUrl}
+                href={item.link}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-blue-700 rounded-2xl py-2.5"
               >
                 <ExternalLink className="w-4 h-4" />
-                לקנייה
+                פתיחת קישור
               </a>
             )}
             {item.type === 'show' && (
@@ -242,12 +264,26 @@ export default function ItemDetail({ item, onClose }) {
         )}
 
         {storedImage && (
-          <img
-            src={storedImage}
-            className="w-full max-h-80 object-contain rounded-2xl bg-slate-100"
-            alt={item.titleHe}
-          />
+          <div>
+            {isNote && (
+              <div className="text-[11px] font-bold text-slate-400 mb-1">
+                התמונה שהעליתי — למה שמרתי את זה
+              </div>
+            )}
+            <img
+              src={storedImage}
+              className="w-full max-h-80 object-contain rounded-2xl bg-slate-100"
+              alt={item.titleHe}
+            />
+          </div>
         )}
+
+        <ImageGallery
+          imageIds={item.extraImageIds || []}
+          onAdd={addGalleryImage}
+          onRemove={removeGalleryImage}
+          busy={galleryBusy}
+        />
 
         {item.summary && (
           <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl px-3 py-2">
@@ -267,82 +303,92 @@ export default function ItemDetail({ item, onClose }) {
         )}
 
         <div>
-          <div className="text-[11px] font-bold text-slate-400 mb-1.5">סטטוס</div>
-          <div className="flex gap-1.5">
-            {STATUSES.map((s) => (
-              <button
-                key={s}
-                onClick={() => updateItem(item.id, { status: s })}
-                className={`flex-1 text-xs rounded-xl py-2 border font-bold transition ${
-                  item.status === s
-                    ? 'bg-teal-700 border-teal-700 text-white'
-                    : 'bg-white border-slate-200 text-slate-500'
-                }`}
-              >
-                {statusLabel(item.type, s)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-bold text-slate-400 mb-1.5">הדירוג שלי</div>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => updateItem(item.id, { myRating: item.myRating === n ? 0 : n })}
-                aria-label={`דירוג ${n}`}
-              >
-                <Star
-                  className={`w-7 h-7 ${
-                    (item.myRating || 0) >= n ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
+          {!item.completed ? (
+            <button
+              onClick={() => updateItem(item.id, { completed: true })}
+              className="w-full flex items-center justify-center gap-2 bg-teal-700 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition"
+            >
+              <Check className="w-4 h-4" />
+              סימון כ"{doneVerb}"
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between bg-emerald-50 text-emerald-700 rounded-2xl px-3 py-2.5">
+                <span className="flex items-center gap-1.5 text-sm font-bold">
+                  <Check className="w-4 h-4" />
+                  {doneVerb}
+                </span>
+                <button
+                  onClick={() => updateItem(item.id, { completed: false, liked: null })}
+                  className="flex items-center gap-1 text-xs font-bold text-emerald-600 underline"
+                >
+                  <Undo2 className="w-3 h-3" />
+                  ביטול
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => updateItem(item.id, { liked: item.liked === true ? null : true })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold rounded-xl py-2 border transition ${
+                    item.liked === true
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-500'
                   }`}
-                />
-              </button>
-            ))}
-          </div>
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                  אהבתי
+                </button>
+                <button
+                  onClick={() => updateItem(item.id, { liked: item.liked === false ? null : false })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold rounded-xl py-2 border transition ${
+                    item.liked === false
+                      ? 'bg-rose-600 border-rose-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-500'
+                  }`}
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                  לא אהבתי
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {item.type === 'place' && (
+        {isNote && (
           <>
-            <ToggleChips label="סוג הבילוי" options={PLACE_TYPES} selected={item.placeTypes} onToggle={toggleMulti('placeTypes')} />
-            <ToggleChips label="מתאים ל..." options={AUDIENCES} selected={item.audiences} onToggle={toggleMulti('audiences')} />
-            <ToggleChips label="אזור" options={REGIONS} selected={item.region} onToggle={toggleSingle('region')} single />
-          </>
-        )}
-
-        {item.type === 'recipe' && (
-          <>
-            <ToggleChips label="סוג המנה" options={DISH_TYPES} selected={item.dishType} onToggle={toggleSingle('dishType')} single />
-            <ToggleChips label="כשרות" options={KASHRUT} selected={item.kashrut} onToggle={toggleSingle('kashrut')} single />
-            <ToggleChips label="תגיות" options={RECIPE_TAGS} selected={item.tags} onToggle={toggleMulti('tags')} />
-          </>
-        )}
-
-        {item.type === 'product' && (
-          <>
-            <ToggleChips label="קטגוריה" options={PRODUCT_CATEGORIES} selected={item.productCategory} onToggle={toggleSingle('productCategory')} single />
             <div className="grid grid-cols-2 gap-2">
+              <EditableField
+                label="סוג (למשל: קוסמטיקה)"
+                value={item.kind || ''}
+                onSave={(v) => updateItem(item.id, { kind: v.trim() })}
+              />
               <EditableField
                 label="מחיר (₪)"
                 type="number"
                 value={item.price ?? ''}
                 onSave={(v) => updateItem(item.id, { price: parseFloat(v) || null })}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <EditableField
-                label="חנות / אתר"
+                label="חנות / מקור"
                 value={item.store || ''}
                 onSave={(v) => updateItem(item.id, { store: v.trim() })}
               />
+              <EditableField
+                label="כתובת (אופציונלי)"
+                value={item.address || ''}
+                onSave={(v) => updateItem(item.id, { address: v.trim(), mapsUrl: '' })}
+              />
             </div>
             <EditableField
-              label="קישור לקנייה"
-              value={item.buyUrl || ''}
+              label="קישור"
+              value={item.link || ''}
               dir="ltr"
               placeholder="https://..."
-              onSave={(v) => updateItem(item.id, { buyUrl: v.trim() })}
+              onSave={(v) => updateItem(item.id, { link: v.trim() })}
             />
+            <TagEditor tags={item.tags || []} onChange={(tags) => updateItem(item.id, { tags })} />
           </>
         )}
 
@@ -473,6 +519,7 @@ export default function ItemDetail({ item, onClose }) {
               return
             }
             deleteImage(item.imageId)
+            ;(item.extraImageIds || []).forEach((id) => deleteImage(id))
             removeItem(item.id)
             onClose()
           }}
