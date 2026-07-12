@@ -58,11 +58,25 @@ async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinki
     throw err
   }
   try {
-    return JSON.parse(text.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim())
+    return parseJsonLoose(text)
   } catch {
     const err = new Error('bad json in response')
     err.bodyText = text.slice(0, 300)
     throw err
+  }
+}
+
+// חלק מהמודלים מוסיפים משפט/גדר קוד סביב ה-JSON למרות responseMimeType — מנקים
+// גדרות קוד, ואם עדיין לא תקין, שולפים את תת-המחרוזת בין הסוגריים המסולסלים הראשון והאחרון
+function parseJsonLoose(text) {
+  const cleaned = text.replace(/```json?/gi, '').replace(/```/g, '').trim()
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) throw new Error('no json object found')
+    return JSON.parse(cleaned.slice(start, end + 1))
   }
 }
 
