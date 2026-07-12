@@ -12,6 +12,7 @@ import SettingsModal from './components/SettingsModal'
 import Modal from './components/Modal'
 import { DEMO } from './services/env'
 import { consumeSharedImage } from './services/shareTarget'
+import { connectSync } from './services/sync'
 import { CATEGORY_BY_ID } from './data/constants'
 
 // התאמת פריט לערך סינון, לפי מפתח הפילטר
@@ -71,6 +72,7 @@ export default function App() {
 
   useEffect(() => {
     if (DEMO && !seeded && items.length === 0) seedDemo()
+    if (!DEMO) connectSync()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

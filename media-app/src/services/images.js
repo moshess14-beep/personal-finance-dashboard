@@ -1,9 +1,16 @@
-// אחסון תמונות (צילומי מסך של מתכונים/מוצרים/בילויים) ב-IndexedDB —
-// localStorage קטן מדי לתמונות, ולכן המטא-דאטה נשאר שם והתמונות כאן.
+// אחסון תמונות (צילומי מסך של מתכונים/מוצרים/בילויים).
+// תמיד נשמר עותק מקומי מהיר ב-IndexedDB (עובד גם בלי רשת); אם המשתמש מחובר לחשבון,
+// נשמר גם עותק ב-Supabase Storage כדי שהתמונה תופיע גם במכשירים אחרים.
 import { useEffect, useState } from 'react'
 
 const DB_NAME = 'media-library-files'
 const STORE = 'images'
+
+// מותקן על ידי services/sync.js לאחר התחברות מוצלחת; null כשמנותקים
+let cloudCtx = null
+export function setImageCloudContext(ctx) {
+  cloudCtx = ctx
+}
 
 let dbPromise = null
 function db() {
@@ -16,7 +23,7 @@ function db() {
   return dbPromise
 }
 
-export async function saveImage(id, blob) {
+async function saveLocal(id, blob) {
   const d = await db()
   return new Promise((resolve, reject) => {
     const tx = d.transaction(STORE, 'readwrite')
@@ -26,7 +33,7 @@ export async function saveImage(id, blob) {
   })
 }
 
-export async function getImage(id) {
+async function getLocal(id) {
   const d = await db()
   return new Promise((resolve, reject) => {
     const rq = d.transaction(STORE).objectStore(STORE).get(id)
@@ -35,19 +42,64 @@ export async function getImage(id) {
   })
 }
 
+async function deleteLocal(id) {
+  const d = await db()
+  await new Promise((resolve) => {
+    const tx = d.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).delete(id)
+    tx.oncomplete = resolve
+    tx.onerror = resolve
+  })
+}
+
+const cloudPath = (userId, id) => `${userId}/${id}.jpg`
+
+export async function saveImage(id, blob) {
+  await saveLocal(id, blob)
+  if (cloudCtx) {
+    cloudCtx.supabase.storage
+      .from('item-images')
+      .upload(cloudPath(cloudCtx.userId, id), blob, { contentType: 'image/jpeg', upsert: true })
+      .catch(() => {
+        // כשלון העלאה לענן לא חוסם שמירה מקומית — התמונה עדיין זמינה במכשיר הזה
+      })
+  }
+}
+
+export async function getImage(id) {
+  const local = await getLocal(id).catch(() => null)
+  if (local) return local
+  if (!cloudCtx) return null
+  try {
+    const { data, error } = await cloudCtx.supabase.storage
+      .from('item-images')
+      .download(cloudPath(cloudCtx.userId, id))
+    if (error || !data) return null
+    saveLocal(id, data).catch(() => {})
+    return data
+  } catch {
+    return null
+  }
+}
+
 export async function deleteImage(id) {
   if (!id) return
-  try {
-    const d = await db()
-    await new Promise((resolve) => {
-      const tx = d.transaction(STORE, 'readwrite')
-      tx.objectStore(STORE).delete(id)
-      tx.oncomplete = resolve
-      tx.onerror = resolve
-    })
-  } catch {
-    // מחיקת תמונה היא ניקיון בלבד — לא חוסמים על כישלון
+  await deleteLocal(id).catch(() => {})
+  if (cloudCtx) {
+    cloudCtx.supabase.storage.from('item-images').remove([cloudPath(cloudCtx.userId, id)]).catch(() => {})
   }
+}
+
+// מעלה תמונה שכבר קיימת מקומית לענן — משמש בסנכרון הראשוני אחרי התחברות,
+// כדי שפריטים שנוצרו לפני החיבור לחשבון יקבלו גם הם עותק בענן.
+export async function migrateLocalImageToCloud(id) {
+  if (!cloudCtx) return
+  const blob = await getLocal(id).catch(() => null)
+  if (!blob) return
+  await cloudCtx.supabase.storage
+    .from('item-images')
+    .upload(cloudPath(cloudCtx.userId, id), blob, { contentType: 'image/jpeg', upsert: true })
+    .catch(() => {})
 }
 
 // הקטנת תמונה לפני שמירה/שליחה ל-AI (חוסך מקום ותעבורה)

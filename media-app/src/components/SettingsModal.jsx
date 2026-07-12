@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import Modal from './Modal'
+import AccountSection from './AccountSection'
 import useLibraryStore from '../store/useLibraryStore'
 import { DEMO } from '../services/env'
 import { testAiKey } from '../services/ai'
@@ -44,6 +45,8 @@ export default function SettingsModal({ onClose }) {
             בגרסה המלאה החיפוש רץ מול מקורות אמיתיים.
           </div>
         )}
+
+        {!DEMO && <AccountSection />}
 
         <div>
           <div className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -129,7 +132,7 @@ export default function SettingsModal({ onClose }) {
         <div>
           <div className="text-sm font-bold text-slate-700 mb-1">נתונים</div>
           <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
-            הנתונים נשמרים כרגע במכשיר זה בלבד. סנכרון בין מכשירים עם חשבון אישי — בשלב הבא.
+            הנתונים נשמרים במכשיר זה, ואם מחוברים לחשבון — גם בענן ומסתנכרנים אוטומטית.
           </p>
           <div className="flex gap-2">
             <button
