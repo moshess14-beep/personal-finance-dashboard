@@ -4,9 +4,10 @@ import { DEMO } from './env'
 import { resizeImage } from './images'
 import { demoAnalyze } from '../data/demoData'
 
-// כמה שמות מודל, לפי סדר עדיפות. gemini-2.0-flash קודם — המכסה החינמית שלו
-// הכי יציבה ומוכחת; מודלים חדשים יותר (2.5) עשויים לקבל מכסת חינם נמוכה/שונה.
-const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+// גוגל מחליפה/מוציאה משימוש שמות מודל קונקרטיים עם הזמן (למשל gemini-1.5-flash).
+// gemini-flash-latest הוא alias יציב שגוגל מתחזקת ומצביע תמיד על המודל המהיר הנוכחי —
+// לכן הוא ראשון. שאר השמות הם רשת ביטחון למקרה שהאלias עדיין לא נתמך במפתח מסוים.
+const MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
 
 // שגיאה עם פירוט טכני, כדי שאפשר יהיה להציג למשתמש מה בדיוק השתבש
 export class AiError extends Error {
@@ -62,16 +63,54 @@ async function callModel(model, apiKey, parts, maxOutputTokens) {
   }
 }
 
+// מודל שהתגלה בהצלחה בקריאה קודמת — משתמשים בו ראשון בפעם הבאה כדי לחסוך ניסיונות
+let discoveredModel = null
+
+// ניסיון אחרון: שואלים את גוגל בעצמה אילו מודלים זמינים למפתח הזה,
+// ובוחרים את הראשון שתומך ב-generateContent ("flash" עדיף, מהיר וזול).
+async function discoverModel(apiKey) {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    )
+    if (!res.ok) return null
+    const json = await res.json()
+    const models = (json.models || []).filter((m) =>
+      (m.supportedGenerationMethods || []).includes('generateContent'),
+    )
+    const pick = models.find((m) => /flash/i.test(m.name)) || models[0]
+    return pick ? pick.name.replace(/^models\//, '') : null
+  } catch {
+    return null
+  }
+}
+
 async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
+  const queue = [...new Set([discoveredModel, ...MODEL_CANDIDATES].filter(Boolean))]
   let lastErr
-  for (const model of MODEL_CANDIDATES) {
+  for (const model of queue) {
     try {
-      return await callModel(model, apiKey, parts, maxOutputTokens)
+      const result = await callModel(model, apiKey, parts, maxOutputTokens)
+      discoveredModel = model
+      return result
     } catch (e) {
       lastErr = e
       // 404 = המודל הזה לא קיים; 429 = יכול להיות מכסה ספציפית לדגם הזה —
       // בשני המקרים שווה לנסות את המודל הבא ברשימה לפני שמוותרים.
       if (e.status !== 404 && e.status !== 429) break
+    }
+  }
+  // כל השמות הידועים נכשלו ב"לא נמצא" — לפני שמוותרים, שואלים את גוגל מה כן זמין
+  if (lastErr?.status === 404) {
+    const found = await discoverModel(apiKey)
+    if (found && !queue.includes(found)) {
+      try {
+        const result = await callModel(found, apiKey, parts, maxOutputTokens)
+        discoveredModel = found
+        return result
+      } catch (e) {
+        lastErr = e
+      }
     }
   }
   const status = lastErr?.status
