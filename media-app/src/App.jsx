@@ -12,17 +12,30 @@ import SettingsModal from './components/SettingsModal'
 import Modal from './components/Modal'
 import { DEMO } from './services/env'
 import { consumeSharedImage } from './services/shareTarget'
+import { CATEGORY_BY_ID } from './data/constants'
 
-const EMPTY_FILTERS = { type: 'all', genre: null, platform: null }
+// התאמת פריט לערך סינון, לפי מפתח הפילטר
+const MATCHERS = {
+  type: (it, v) => v === 'all' || it.type === v,
+  genre: (it, v) => (it.genres || []).includes(v),
+  platform: (it, v) => (it.availability || []).some((a) => a.platform === v),
+  placeType: (it, v) => (it.placeTypes || []).includes(v),
+  audience: (it, v) => (it.audiences || []).includes(v),
+  region: (it, v) => it.region === v,
+  dishType: (it, v) => it.dishType === v,
+  kashrut: (it, v) => it.kashrut === v,
+  tag: (it, v) => (it.tags || []).includes(v),
+  productCategory: (it, v) => it.productCategory === v,
+}
 
 export default function App() {
   const items = useLibraryStore((s) => s.items)
   const seeded = useLibraryStore((s) => s.seeded)
   const seedDemo = useLibraryStore((s) => s.seedDemo)
 
-  const [view, setView] = useState(null) // null (מסך פתיחה) | 'books' | 'screen'
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [addFlow, setAddFlow] = useState(null) // {mode:'image', file} | {mode:'name'}
+  const [view, setView] = useState(null) // null (מסך פתיחה) | מזהה קטגוריה
+  const [filters, setFilters] = useState({})
+  const [addFlow, setAddFlow] = useState(null) // {mode, file?, category?}
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [openItemId, setOpenItemId] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -38,36 +51,35 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('shared') !== '1') return
     consumeSharedImage().then((file) => {
-      if (file) setAddFlow({ mode: 'image', file })
+      if (file) setAddFlow({ mode: 'image', file, category: null })
       window.history.replaceState(null, '', window.location.pathname)
     })
   }, [])
 
-  const books = useMemo(() => items.filter((it) => it.type === 'book'), [items])
-  const screen = useMemo(() => items.filter((it) => it.type !== 'book'), [items])
+  const category = view ? CATEGORY_BY_ID[view] : null
 
-  const categoryItems = view === 'books' ? books : screen
+  const categoryItems = useMemo(
+    () => (category ? items.filter((it) => category.types.includes(it.type)) : []),
+    [items, category],
+  )
 
   const filtered = useMemo(
     () =>
-      categoryItems.filter((it) => {
-        if (view === 'screen' && filters.type !== 'all' && it.type !== filters.type) return false
-        if (filters.genre && !(it.genres || []).includes(filters.genre)) return false
-        if (
-          filters.platform &&
-          !(it.availability || []).some((a) => a.platform === filters.platform)
-        )
-          return false
-        return true
-      }),
-    [categoryItems, filters, view],
+      categoryItems.filter((it) =>
+        Object.entries(filters).every(([key, value]) => {
+          if (value == null) return true
+          const match = MATCHERS[key]
+          return match ? match(it, value) : true
+        }),
+      ),
+    [categoryItems, filters],
   )
 
   const openItem = items.find((it) => it.id === openItemId)
 
-  const openCategory = (v) => {
-    setFilters(EMPTY_FILTERS)
-    setView(v)
+  const openCategory = (id) => {
+    setFilters({})
+    setView(id)
   }
 
   const showToast = (msg) => {
@@ -77,25 +89,21 @@ export default function App() {
 
   const startAdd = (flow) => {
     setShowAddChooser(false)
-    setAddFlow(flow)
+    setAddFlow({ category: view, ...flow })
   }
 
   return (
-    <div className={`min-h-screen ${view ? 'pb-44' : 'pb-10'}`}>
+    <div className={`min-h-screen ${view ? 'pb-48' : 'pb-10'}`}>
       <Header onSettings={() => setShowSettings(true)} />
 
       <main className="max-w-lg mx-auto px-3">
         {view === null ? (
           <>
             <AddBar
-              onImage={(file) => startAdd({ mode: 'image', file })}
-              onName={() => startAdd({ mode: 'name' })}
+              onImage={(file) => startAdd({ mode: 'image', file, category: null })}
+              onName={() => startAdd({ mode: 'name', category: null })}
             />
-            <HomeTiles
-              bookCount={books.length}
-              screenCount={screen.length}
-              onOpen={openCategory}
-            />
+            <HomeTiles items={items} onOpen={openCategory} />
           </>
         ) : (
           <CategoryView
@@ -119,7 +127,7 @@ export default function App() {
           />
           <button
             onClick={() => setShowAddChooser(true)}
-            className="fixed bottom-36 start-4 z-30 w-13 h-13 p-3.5 rounded-full bg-indigo-600 text-white shadow-lg active:scale-95 transition"
+            className="fixed bottom-40 start-4 z-30 p-3.5 rounded-full bg-indigo-600 text-white shadow-lg active:scale-95 transition"
             aria-label="הוספת פריט"
           >
             <Plus className="w-6 h-6" />
@@ -128,7 +136,10 @@ export default function App() {
       )}
 
       {showAddChooser && (
-        <Modal title="הוספת פריט חדש" onClose={() => setShowAddChooser(false)}>
+        <Modal
+          title={`הוספה ל${category?.label || 'המלצות'}`}
+          onClose={() => setShowAddChooser(false)}
+        >
           <AddBar
             onImage={(file) => startAdd({ mode: 'image', file })}
             onName={() => startAdd({ mode: 'name' })}
@@ -142,7 +153,7 @@ export default function App() {
           onClose={() => setAddFlow(null)}
           onSaved={() => {
             setAddFlow(null)
-            showToast('נשמר בספרייה ✓')
+            showToast('נשמר בהמלצות ✓')
           }}
         />
       )}

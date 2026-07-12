@@ -1,6 +1,15 @@
 import { useMemo } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { PLATFORMS } from '../data/platforms'
+import {
+  PLACE_TYPES,
+  AUDIENCES,
+  REGIONS,
+  DISH_TYPES,
+  KASHRUT,
+  RECIPE_TAGS,
+  PRODUCT_CATEGORIES,
+} from '../data/taxonomies'
 
 const SCREEN_TYPE_OPTIONS = [
   { value: 'all', label: 'הכול' },
@@ -33,18 +42,46 @@ function ChipRow({ label, children }) {
   )
 }
 
-// סרגל סינון בתוך קטגוריה: ספרים — ז'אנר בלבד; סרטים — סוג + ז'אנר + פלטפורמת סטרימינג
+// שורות הסינון לכל קטגוריה
+function rowsFor(mode, genres) {
+  switch (mode) {
+    case 'books':
+      return [{ key: 'genre', label: "ז'אנר", options: genres }]
+    case 'screen':
+      return [
+        { key: 'genre', label: "ז'אנר", options: genres },
+        { key: 'platform', label: 'זמין ב־', options: PLATFORMS, platform: true },
+      ]
+    case 'places':
+      return [
+        { key: 'placeType', label: 'סוג', options: PLACE_TYPES },
+        { key: 'audience', label: 'למי', options: AUDIENCES },
+        { key: 'region', label: 'אזור', options: REGIONS },
+      ]
+    case 'recipes':
+      return [
+        { key: 'dishType', label: 'מנה', options: DISH_TYPES },
+        { key: 'kashrut', label: 'כשרות', options: KASHRUT },
+        { key: 'tag', label: 'תגית', options: RECIPE_TAGS },
+      ]
+    case 'products':
+      return [{ key: 'productCategory', label: 'קטגוריה', options: PRODUCT_CATEGORIES }]
+    default:
+      return []
+  }
+}
+
 export default function FiltersBar({ mode, items, filters, setFilters, shownCount }) {
   const genres = useMemo(
     () =>
-      [...new Set(items.flatMap((i) => i.genres || []))].sort((a, b) =>
-        a.localeCompare(b, 'he'),
-      ),
+      [...new Set(items.flatMap((i) => i.genres || []))].sort((a, b) => a.localeCompare(b, 'he')),
     [items],
   )
 
   const toggle = (key, value) =>
-    setFilters((f) => ({ ...f, [key]: f[key] === value ? (key === 'type' ? 'all' : null) : value }))
+    setFilters((f) => ({ ...f, [key]: f[key] === value ? null : value }))
+
+  const rows = rowsFor(mode, genres).filter((r) => r.options.length > 0)
 
   return (
     <div
@@ -59,7 +96,7 @@ export default function FiltersBar({ mode, items, filters, setFilters, shownCoun
               {SCREEN_TYPE_OPTIONS.map((opt) => (
                 <Chip
                   key={opt.value}
-                  active={filters.type === opt.value}
+                  active={(filters.type || 'all') === opt.value}
                   onClick={() => setFilters((f) => ({ ...f, type: opt.value }))}
                 >
                   {opt.label}
@@ -74,30 +111,24 @@ export default function FiltersBar({ mode, items, filters, setFilters, shownCoun
           </span>
         </div>
 
-        {genres.length > 0 && (
-          <ChipRow label="ז'אנר">
-            {genres.map((g) => (
-              <Chip key={g} active={filters.genre === g} onClick={() => toggle('genre', g)}>
-                {g}
-              </Chip>
-            ))}
+        {rows.map((row) => (
+          <ChipRow key={row.key} label={row.label}>
+            {row.options.map((opt) => {
+              const value = row.platform ? opt.id : opt
+              const label = row.platform ? opt.label : opt
+              return (
+                <Chip
+                  key={value}
+                  color={row.platform ? opt.color : undefined}
+                  active={filters[row.key] === value}
+                  onClick={() => toggle(row.key, value)}
+                >
+                  {label}
+                </Chip>
+              )
+            })}
           </ChipRow>
-        )}
-
-        {mode === 'screen' && (
-          <ChipRow label="זמין ב־">
-            {PLATFORMS.map((p) => (
-              <Chip
-                key={p.id}
-                color={p.color}
-                active={filters.platform === p.id}
-                onClick={() => toggle('platform', p.id)}
-              >
-                {p.label}
-              </Chip>
-            ))}
-          </ChipRow>
-        )}
+        ))}
       </div>
     </div>
   )

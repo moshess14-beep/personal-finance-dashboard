@@ -1,11 +1,52 @@
 import { useState } from 'react'
-import { Star, Trash2, RefreshCw, Loader2 } from 'lucide-react'
+import { Star, Trash2, RefreshCw, Loader2, MapPin, ExternalLink } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
 import useLibraryStore from '../store/useLibraryStore'
 import { fetchAvailability } from '../services/search'
-import { STATUSES, TYPE_LABEL, TYPE_BADGE_STYLE, CREATOR_LABEL } from '../data/constants'
+import { useItemImage, deleteImage } from '../services/images'
+import { mapsSearchUrl } from '../services/places'
+import {
+  STATUSES,
+  TYPE_LABEL,
+  TYPE_BADGE_STYLE,
+  CREATOR_LABEL,
+  statusLabel,
+} from '../data/constants'
 import { PLATFORMS, PLATFORM_BY_ID } from '../data/platforms'
+import {
+  PLACE_TYPES,
+  AUDIENCES,
+  REGIONS,
+  DISH_TYPES,
+  KASHRUT,
+  RECIPE_TAGS,
+  PRODUCT_CATEGORIES,
+} from '../data/taxonomies'
+
+function ToggleChips({ label, options, selected, onToggle, single }) {
+  const isSelected = (opt) => (single ? selected === opt : (selected || []).includes(opt))
+  return (
+    <div>
+      <div className="text-[11px] font-bold text-slate-400 mb-1.5">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => onToggle(opt)}
+            className={`text-xs rounded-full px-3 py-1.5 border font-semibold transition ${
+              isSelected(opt)
+                ? 'bg-indigo-600 border-indigo-600 text-white'
+                : 'bg-white border-slate-200 text-slate-400'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
@@ -16,10 +57,19 @@ export default function ItemDetail({ item, onClose }) {
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState(null)
 
-  const isScreen = item.type !== 'book'
+  const isScreen = item.type === 'movie' || item.type === 'series'
   const availability = item.availability || []
+  const storedImage = useItemImage(item.imageId)
 
-  // בדיקת זמינות מחדש: שומרים סימונים ידניים, מחליפים את האוטומטיים
+  const toggleMulti = (key) => (opt) => {
+    const current = item[key] || []
+    updateItem(item.id, {
+      [key]: current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt],
+    })
+  }
+  const toggleSingle = (key) => (opt) =>
+    updateItem(item.id, { [key]: item[key] === opt ? null : opt })
+
   async function checkAvailability() {
     setChecking(true)
     setCheckResult(null)
@@ -57,10 +107,17 @@ export default function ItemDetail({ item, onClose }) {
     item.type === 'series' && item.episodeRuntimeMinutes
       ? `כ־${item.episodeRuntimeMinutes} דק' לפרק`
       : null,
+    item.type === 'product' && item.price ? `₪${item.price}` : null,
+    item.type === 'product' && item.store ? item.store : null,
   ].filter(Boolean)
 
+  const mapsHref =
+    item.type === 'place'
+      ? item.mapsUrl || mapsSearchUrl(`${item.titleHe} ${item.address || ''}`.trim())
+      : null
+
   return (
-    <Modal title="פרטי הפריט" onClose={onClose}>
+    <Modal title="פרטי ההמלצה" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex gap-3">
           <Cover item={item} className="w-24 aspect-[2/3] rounded-xl shrink-0" />
@@ -76,7 +133,7 @@ export default function ItemDetail({ item, onClose }) {
                 {item.titleOriginal}
               </div>
             )}
-            {item.creator && (
+            {item.creator && CREATOR_LABEL[item.type] && (
               <div className="text-sm text-slate-600 mt-1">
                 <span className="text-slate-400 text-xs">{CREATOR_LABEL[item.type]}: </span>
                 {item.creator}
@@ -84,6 +141,12 @@ export default function ItemDetail({ item, onClose }) {
             )}
             {metaParts.length > 0 && (
               <div className="text-xs text-slate-500 mt-1">{metaParts.join(' · ')}</div>
+            )}
+            {item.type === 'place' && item.address && (
+              <div className="text-xs text-slate-500 mt-1 flex items-start gap-1">
+                <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
+                <span className="line-clamp-2">{item.address}</span>
+              </div>
             )}
             {item.genres?.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -102,10 +165,56 @@ export default function ItemDetail({ item, onClose }) {
           </div>
         </div>
 
+        {(item.type === 'place' || item.type === 'product') && (
+          <div className="flex gap-2">
+            {mapsHref && (
+              <a
+                href={mapsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-emerald-600 rounded-2xl py-2.5"
+              >
+                <MapPin className="w-4 h-4" />
+                פתיחה במפות
+              </a>
+            )}
+            {item.type === 'product' && item.buyUrl && (
+              <a
+                href={item.buyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-sky-600 rounded-2xl py-2.5"
+              >
+                <ExternalLink className="w-4 h-4" />
+                לקנייה
+              </a>
+            )}
+          </div>
+        )}
+
+        {storedImage && (
+          <img
+            src={storedImage}
+            className="w-full max-h-80 object-contain rounded-2xl bg-slate-100"
+            alt={item.titleHe}
+          />
+        )}
+
         {item.summary && (
           <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl px-3 py-2">
             {item.summary}
           </p>
+        )}
+
+        {item.sourceText && (
+          <details className="bg-slate-50 rounded-xl px-3 py-2">
+            <summary className="text-[11px] font-bold text-slate-400 cursor-pointer">
+              הטקסט שזוהה מהתמונה
+            </summary>
+            <p className="text-xs text-slate-500 leading-relaxed mt-1.5 whitespace-pre-wrap">
+              {item.sourceText}
+            </p>
+          </details>
         )}
 
         <div>
@@ -121,7 +230,7 @@ export default function ItemDetail({ item, onClose }) {
                     : 'bg-white border-slate-200 text-slate-500'
                 }`}
               >
-                {s}
+                {statusLabel(item.type, s)}
               </button>
             ))}
           </div>
@@ -138,15 +247,55 @@ export default function ItemDetail({ item, onClose }) {
               >
                 <Star
                   className={`w-7 h-7 ${
-                    (item.myRating || 0) >= n
-                      ? 'fill-amber-400 text-amber-400'
-                      : 'text-slate-200'
+                    (item.myRating || 0) >= n ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
                   }`}
                 />
               </button>
             ))}
           </div>
         </div>
+
+        {item.type === 'place' && (
+          <>
+            <ToggleChips label="סוג הבילוי" options={PLACE_TYPES} selected={item.placeTypes} onToggle={toggleMulti('placeTypes')} />
+            <ToggleChips label="מתאים ל..." options={AUDIENCES} selected={item.audiences} onToggle={toggleMulti('audiences')} />
+            <ToggleChips label="אזור" options={REGIONS} selected={item.region} onToggle={toggleSingle('region')} single />
+          </>
+        )}
+
+        {item.type === 'recipe' && (
+          <>
+            <ToggleChips label="סוג המנה" options={DISH_TYPES} selected={item.dishType} onToggle={toggleSingle('dishType')} single />
+            <ToggleChips label="כשרות" options={KASHRUT} selected={item.kashrut} onToggle={toggleSingle('kashrut')} single />
+            <ToggleChips label="תגיות" options={RECIPE_TAGS} selected={item.tags} onToggle={toggleMulti('tags')} />
+          </>
+        )}
+
+        {item.type === 'product' && (
+          <>
+            <ToggleChips label="קטגוריה" options={PRODUCT_CATEGORIES} selected={item.productCategory} onToggle={toggleSingle('productCategory')} single />
+            <div className="grid grid-cols-2 gap-2">
+              <EditableField
+                label="מחיר (₪)"
+                type="number"
+                value={item.price ?? ''}
+                onSave={(v) => updateItem(item.id, { price: parseFloat(v) || null })}
+              />
+              <EditableField
+                label="חנות / אתר"
+                value={item.store || ''}
+                onSave={(v) => updateItem(item.id, { store: v.trim() })}
+              />
+            </div>
+            <EditableField
+              label="קישור לקנייה"
+              value={item.buyUrl || ''}
+              dir="ltr"
+              placeholder="https://..."
+              onSave={(v) => updateItem(item.id, { buyUrl: v.trim() })}
+            />
+          </>
+        )}
 
         {isScreen && (
           <div>
@@ -230,6 +379,7 @@ export default function ItemDetail({ item, onClose }) {
               setConfirmDelete(true)
               return
             }
+            deleteImage(item.imageId)
             removeItem(item.id)
             onClose()
           }}
@@ -238,9 +388,27 @@ export default function ItemDetail({ item, onClose }) {
           }`}
         >
           <Trash2 className="w-4 h-4" />
-          {confirmDelete ? 'בטוח? הקישו שוב למחיקה סופית' : 'מחיקה מהספרייה'}
+          {confirmDelete ? 'בטוח? הקישו שוב למחיקה סופית' : 'מחיקה מההמלצות'}
         </button>
       </div>
     </Modal>
+  )
+}
+
+function EditableField({ label, value, onSave, type = 'text', dir, placeholder }) {
+  const [v, setV] = useState(String(value))
+  return (
+    <div>
+      <label className="text-[11px] font-bold text-slate-400">{label}</label>
+      <input
+        type={type}
+        value={v}
+        dir={dir}
+        placeholder={placeholder}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => onSave(v)}
+        className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+      />
+    </div>
   )
 }

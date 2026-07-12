@@ -147,6 +147,95 @@ export const demoItems = [
     availability: [{ platform: 'netflix', kind: 'מנוי', manual: false }],
     createdAt: now - 5 * day,
   },
+  {
+    id: 'demo-p1',
+    type: 'place',
+    titleHe: 'גן לאומי עין גדי',
+    address: 'עין גדי, מדבר יהודה',
+    region: 'דרום',
+    placeTypes: ['טבע ומסלולים'],
+    audiences: ['עם הילדים', 'כל המשפחה'],
+    summary: 'מסלולי מים ומפלים בלב המדבר — נחל דוד ונחל ערוגות.',
+    status: 'הושלם',
+    myRating: 5,
+    identification: 'confirmed',
+    createdAt: now - 15 * day,
+  },
+  {
+    id: 'demo-p2',
+    type: 'place',
+    titleHe: 'מוזיאון המדע בלומפילד',
+    address: 'רחוב המוזיאונים 3, ירושלים',
+    region: 'ירושלים והסביבה',
+    placeTypes: ['מוזיאון ותרבות', 'אטרקציה'],
+    audiences: ['עם הילדים'],
+    summary: 'מוזיאון אינטראקטיבי — מומלץ ליום גשום עם הילדים.',
+    status: 'רוצה',
+    identification: 'manual',
+    createdAt: now - 4 * day,
+  },
+  {
+    id: 'demo-p3',
+    type: 'place',
+    titleHe: 'צימר נוף לחרמון',
+    address: 'נווה אטי"ב, רמת הגולן',
+    region: 'צפון',
+    placeTypes: ['לינה'],
+    audiences: ['זוגי'],
+    summary: "המלצה מחברים — ג'קוזי ונוף מטורף.",
+    status: 'רוצה',
+    identification: 'manual',
+    createdAt: now - 2 * day,
+  },
+  {
+    id: 'demo-r1',
+    type: 'recipe',
+    titleHe: 'שקשוקה עם פטה וזעתר',
+    dishType: 'ארוחת בוקר',
+    kashrut: 'חלבי',
+    tags: ['מהיר וקל', 'ילדים אוהבים'],
+    sourceText: 'שקשוקה מנצחת: רסק, 4 ביצים, פטה מעל, זעתר בסוף. 20 דקות והכול מוכן.',
+    status: 'הושלם',
+    myRating: 4,
+    identification: 'manual',
+    createdAt: now - 9 * day,
+  },
+  {
+    id: 'demo-r2',
+    type: 'recipe',
+    titleHe: 'עוגת שוקולד בלי קמח',
+    dishType: 'קינוח',
+    kashrut: 'פרווה',
+    tags: ['אירוח', 'אפייה'],
+    sourceText: 'עוגת השוקולד שכולם מבקשים את המתכון — בלי קמח, 5 מרכיבים בלבד.',
+    status: 'רוצה',
+    identification: 'manual',
+    createdAt: now - day,
+  },
+  {
+    id: 'demo-pr1',
+    type: 'product',
+    titleHe: 'קומקום שקט עם בקרת טמפרטורה',
+    productCategory: 'מטבח',
+    price: 189,
+    store: 'KSP',
+    summary: 'ההמלצה מהקבוצה של השכונה — שקט ומדויק לתה.',
+    status: 'רוצה',
+    identification: 'manual',
+    createdAt: now - 6 * day,
+  },
+  {
+    id: 'demo-pr2',
+    type: 'product',
+    titleHe: 'בקבוק טרמי לילדים',
+    productCategory: 'ילדים',
+    price: 45,
+    store: 'עזריאלי אונליין',
+    status: 'הושלם',
+    myRating: 4,
+    identification: 'manual',
+    createdAt: now - 18 * day,
+  },
 ]
 
 // טקסט שמוחזר מ"קריאת תמונה" מדומה במצב הדגמה
@@ -230,4 +319,30 @@ export async function demoAvailability(item) {
   await sleep(900)
   if (item.availability?.length) return item.availability.filter((a) => !a.manual)
   return [{ platform: 'netflix', kind: 'מנוי', manual: false }]
+}
+
+// ניתוח תמונה מדומה במצב הדגמה (במקום Gemini)
+export async function demoAnalyze() {
+  await sleep(1400)
+  return {
+    category: 'movie',
+    title: 'פורסט גאמפ',
+    altTitle: 'Forrest Gump',
+    creator: '',
+    year: 1994,
+    address: '',
+    price: null,
+    store: '',
+    rawText: demoOcrText,
+    confidence: 'high',
+  }
+}
+
+// חיפוש כתובת מדומה במצב הדגמה (במקום Nominatim)
+export async function demoPlaces(query) {
+  await sleep(600)
+  return [
+    { name: query, address: `${query}, ישראל` },
+    { name: `${query} (אתר נוסף)`, address: `${query}, אזור הצפון, ישראל` },
+  ]
 }

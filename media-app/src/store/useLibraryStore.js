@@ -7,6 +7,7 @@ const useLibraryStore = create(
     (set) => ({
       items: [],
       tmdbKey: '',
+      aiKey: '',
       seeded: false,
 
       addItem: (item) =>
@@ -22,6 +23,8 @@ const useLibraryStore = create(
       removeItem: (id) => set((s) => ({ items: s.items.filter((it) => it.id !== id) })),
 
       setTmdbKey: (tmdbKey) => set({ tmdbKey }),
+
+      setAiKey: (aiKey) => set({ aiKey }),
 
       seedDemo: () =>
         set((s) => ({

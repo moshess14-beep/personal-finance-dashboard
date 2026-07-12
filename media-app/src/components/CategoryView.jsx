@@ -1,13 +1,9 @@
-import { ArrowRight, BookOpen, Clapperboard } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import ItemCard from './ItemCard'
-
-const META = {
-  books: { title: 'ספרים', Icon: BookOpen, iconColor: 'text-amber-600' },
-  screen: { title: 'סרטים וסדרות', Icon: Clapperboard, iconColor: 'text-indigo-600' },
-}
+import { CATEGORY_BY_ID } from '../data/constants'
 
 export default function CategoryView({ view, items, totalCount, onBack, onOpenItem }) {
-  const { title, Icon, iconColor } = META[view]
+  const category = CATEGORY_BY_ID[view]
 
   return (
     <div className="mt-4">
@@ -19,15 +15,16 @@ export default function CategoryView({ view, items, totalCount, onBack, onOpenIt
         >
           <ArrowRight className="w-5 h-5" />
         </button>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
-        <h2 className="font-black text-lg text-slate-800">{title}</h2>
-        <span className="text-sm text-slate-400 font-bold">({items.length})</span>
+        <span className="text-lg">{category.emoji}</span>
+        <h2 className="font-black text-lg text-slate-800">{category.label}</h2>
+        <span className="text-xs text-slate-400 font-semibold">{category.sub}</span>
+        <span className="text-sm text-slate-400 font-bold ms-auto">({items.length})</span>
       </div>
 
       {items.length === 0 ? (
         <div className="bg-white/60 border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-400 leading-relaxed mt-3">
           {totalCount === 0
-            ? 'אין עדיין פריטים בקטגוריה — חזרו למסך הראשי והעלו תמונה או הקלידו שם'
+            ? 'אין עדיין פריטים בקטגוריה — הוסיפו עם כפתור ה-+ או העלו תמונה מהמסך הראשי'
             : 'אין פריטים שמתאימים לסינון הנוכחי'}
         </div>
       ) : (
