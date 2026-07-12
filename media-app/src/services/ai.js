@@ -51,17 +51,20 @@ async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinki
   const candidate = json.candidates?.[0]
   const finishReason = candidate?.finishReason
   const text = (candidate?.content?.parts || []).map((p) => p.text || '').join('')
+  // MAX_TOKENS = התשובה נקטעה (לרוב כי המודל "חשב" ובזבז את מכסת הטוקנים) — ניתן לניסיון חוזר
+  const truncated = finishReason === 'MAX_TOKENS'
   if (!text) {
     const err = new Error(`empty response (finishReason: ${finishReason || 'none'})`)
     err.finishReason = finishReason
-    err.emptyResponse = true
+    err.retryable = true
     throw err
   }
   try {
     return parseJsonLoose(text)
   } catch {
-    const err = new Error('bad json in response')
+    const err = new Error(`bad json in response (finishReason: ${finishReason || 'none'})`)
     err.bodyText = text.slice(0, 300)
+    err.retryable = truncated
     throw err
   }
 }
@@ -84,10 +87,11 @@ async function callModel(model, apiKey, parts, maxOutputTokens) {
   try {
     return await callModelRaw(model, apiKey, parts, maxOutputTokens, true)
   } catch (e) {
-    // אם השדה thinkingConfig עצמו נדחה (400) או שהתשובה עדיין יצאה ריקה —
-    // ניסיון נוסף על אותו מודל בלי הגבלת החשיבה, עם מכסת טוקנים גדולה יותר
-    if (e.status === 400 || e.emptyResponse) {
-      return await callModelRaw(model, apiKey, parts, Math.max(maxOutputTokens, 500), false)
+    // ניסיון חוזר על אותו מודל אם: השדה thinkingConfig נדחה (400), התשובה יצאה ריקה,
+    // או שהתשובה נקטעה (MAX_TOKENS). מודלים מסוימים לא מכבדים thinkingBudget=0 ומבזבזים
+    // טוקנים על "חשיבה", ולכן נותנים מכסה נדיבה בהרבה ומבטלים את הגבלת החשיבה.
+    if (e.status === 400 || e.retryable) {
+      return await callModelRaw(model, apiKey, parts, Math.max(maxOutputTokens * 4, 4096), false)
     }
     throw e
   }
@@ -115,7 +119,9 @@ async function discoverModel(apiKey) {
   }
 }
 
-async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
+// מכסת ברירת מחדל נדיבה: מודלי 2.5 סופרים גם טוקני "חשיבה" בתוך המכסה, ולכן ערך
+// נמוך מדי קוטע את התשובה עוד לפני שנכתב ה-JSON.
+async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
   const queue = [...new Set([discoveredModel, ...MODEL_CANDIDATES].filter(Boolean))]
   let lastErr
   for (const model of queue) {
@@ -238,9 +244,7 @@ export async function aiCompleteDetails(candidate, apiKey) {
 export async function testAiKey(apiKey) {
   if (DEMO) return true
   if (!apiKey) throw new AiError('לא הוזן מפתח', 'no key')
-  const result = await geminiJson(apiKey, [
-    { text: 'החזר JSON בדיוק כך: {"ok":true}' },
-  ], 50)
+  const result = await geminiJson(apiKey, [{ text: 'החזר JSON בדיוק כך: {"ok":true}' }])
   if (!result?.ok) throw new AiError('תשובה לא צפויה מהשירות', JSON.stringify(result))
   return true
 }
