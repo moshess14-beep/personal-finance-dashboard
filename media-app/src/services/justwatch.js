@@ -3,6 +3,31 @@ import { JW_GENRES_HE } from '../data/genres'
 
 const JW_URL = 'https://apis.justwatch.com/graphql'
 
+// JustWatch אינו שולח כותרות CORS, ולכן בקשה ישירה מהדפדפן נחסמת.
+// מנסים קודם ישירות (למקרה שכבר עובד), ואז דרך פרוקסי שמוסיף כותרות CORS.
+const CORS_PROXIES = [
+  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url) => `https://proxy.cors.sh/${url}`,
+]
+
+async function jwPost(body) {
+  const attempts = [
+    () => fetch(JW_URL, body),
+    ...CORS_PROXIES.map((wrap) => () => fetch(wrap(JW_URL), body)),
+  ]
+  let lastErr
+  for (const attempt of attempts) {
+    try {
+      const res = await attempt()
+      if (res.ok) return res
+      lastErr = new Error(`jw http ${res.status}`)
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  throw lastErr || new Error('jw unreachable')
+}
+
 // שתי רמות שאילתה: מלאה (כולל קרדיטים וז'אנרים), ומינימלית כגיבוי אם הסכמה השתנתה
 const FULL_FIELDS = `
   id
@@ -45,7 +70,7 @@ async function jwQuery(fields, searchQuery, first = 5) {
       edges { node { ${fields} } }
     }
   }`
-  const res = await fetch(JW_URL, {
+  const res = await jwPost({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -58,7 +83,6 @@ async function jwQuery(fields, searchQuery, first = 5) {
       },
     }),
   })
-  if (!res.ok) throw new Error(`jw http ${res.status}`)
   const json = await res.json()
   if (json.errors?.length || !json.data?.popularTitles) throw new Error('jw gql error')
   return json.data.popularTitles.edges.map((e) => e.node)

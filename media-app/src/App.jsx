@@ -11,6 +11,7 @@ import ItemDetail from './components/ItemDetail'
 import SettingsModal from './components/SettingsModal'
 import Modal from './components/Modal'
 import { DEMO } from './services/env'
+import { consumeSharedImage } from './services/shareTarget'
 
 const EMPTY_FILTERS = { type: 'all', genre: null, platform: null }
 
@@ -30,6 +31,16 @@ export default function App() {
   useEffect(() => {
     if (DEMO && !seeded && items.length === 0) seedDemo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // תמונה ששותפה מאפליקציה אחרת (גוגל תמונות / וואטסאפ) → פתיחת זרימת ההוספה
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('shared') !== '1') return
+    consumeSharedImage().then((file) => {
+      if (file) setAddFlow({ mode: 'image', file })
+      window.history.replaceState(null, '', window.location.pathname)
+    })
   }, [])
 
   const books = useMemo(() => items.filter((it) => it.type === 'book'), [items])

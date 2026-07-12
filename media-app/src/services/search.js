@@ -74,23 +74,54 @@ async function searchScreen(query, tmdbKey) {
   return searchScreenWiki(query)
 }
 
-// רענון זמינות סטרימינג לפריט שמור (כפתור "בדיקת זמינות עכשיו")
-export async function fetchAvailability(item) {
-  if (DEMO) return demoAvailability(item)
-  const norm = (s) => (s || '').replace(/[^א-תa-z0-9]+/gi, '').toLowerCase()
-  const results = await searchJustWatch(item.titleHe)
+const norm = (s) => (s || '').replace(/[^א-תa-z0-9]+/gi, '').toLowerCase()
+
+function bestMatch(results, item) {
   const sameType = results.filter((r) => r.type === item.type)
-  const best =
+  return (
     sameType.find(
       (r) =>
         norm(r.titleHe) === norm(item.titleHe) &&
         (!item.year || !r.year || Math.abs(r.year - item.year) <= 1),
     ) ||
     sameType.find(
-      (r) => norm(r.titleHe).includes(norm(item.titleHe)) || norm(item.titleHe).includes(norm(r.titleHe)),
+      (r) =>
+        norm(r.titleHe).includes(norm(item.titleHe)) ||
+        norm(item.titleHe).includes(norm(r.titleHe)),
     )
-  if (!best) throw new Error('not found')
-  return best.availability || []
+  )
+}
+
+// רענון זמינות סטרימינג לפריט שמור (כפתור "בדיקת זמינות עכשיו").
+// מחזיר { availability, found } כדי להבחין בין "אין זמינות" לבין תקלה.
+export async function fetchAvailability(item, tmdbKey) {
+  if (DEMO) return { availability: await demoAvailability(item), found: true }
+
+  let networkError = false
+
+  // 1) JustWatch (ללא מפתח, כולל זמינות בישראל)
+  try {
+    const best = bestMatch(await searchJustWatch(item.titleHe), item)
+    if (best) return { availability: best.availability || [], found: true }
+  } catch {
+    networkError = true
+  }
+
+  // 2) TMDB כגיבוי (אם הוזן מפתח)
+  if (tmdbKey) {
+    try {
+      const best = bestMatch(await searchScreenTmdb(item.titleHe, tmdbKey), item)
+      if (best) {
+        const enriched = await enrichCandidate(best, tmdbKey)
+        return { availability: enriched.availability || [], found: true }
+      }
+    } catch {
+      networkError = true
+    }
+  }
+
+  if (networkError) throw new Error('network')
+  return { availability: [], found: false }
 }
 
 async function searchScreenTmdb(query, key) {
