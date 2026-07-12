@@ -21,7 +21,7 @@ export default function AddBar({ onImage, onName }) {
     <div className="mt-4 space-y-2">
       <button
         onClick={() => fileRef.current?.click()}
-        className="w-full bg-gradient-to-l from-indigo-600 to-violet-600 text-white rounded-2xl py-4 flex items-center justify-center gap-2.5 font-bold text-lg shadow-md active:scale-[0.99] transition"
+        className="w-full bg-gradient-to-l from-slate-800 to-teal-700 text-white rounded-2xl py-4 flex items-center justify-center gap-2.5 font-bold text-lg shadow-md active:scale-[0.99] transition"
       >
         <Camera className="w-6 h-6" />
         העלה תמונה של המלצה

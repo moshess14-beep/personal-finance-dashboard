@@ -24,7 +24,7 @@ function Tile({ category, count, onClick, wide }) {
   )
 }
 
-// מסך הבית: חמש קטגוריות ההמלצות
+// מסך הבית: קטגוריות ההמלצות (מספר זוגי → תמיד גריד מלא בלי אריח רחב)
 export default function HomeTiles({ items, onOpen }) {
   const countFor = (cat) => items.filter((it) => cat.types.includes(it.type)).length
   return (

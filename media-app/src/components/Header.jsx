@@ -3,7 +3,7 @@ import { DEMO } from '../services/env'
 
 export default function Header({ onSettings }) {
   return (
-    <header className="bg-gradient-to-l from-indigo-600 via-violet-600 to-fuchsia-600 text-white">
+    <header className="bg-gradient-to-l from-slate-950 via-slate-900 to-teal-900 text-white">
       <div className="max-w-lg mx-auto px-4 pt-5 pb-4 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-black flex items-center gap-2">
@@ -15,7 +15,7 @@ export default function Header({ onSettings }) {
             )}
           </h1>
           <p className="text-xs text-white/80 mt-1">
-            ספרים · סרטים · בילויים · מתכונים · מוצרים — הכול במקום אחד
+            קריאה · צפייה · בילויים · מתכונים · מוצרים · הופעות חיות
           </p>
         </div>
         <button

@@ -14,20 +14,25 @@ export const TYPE_LABEL = {
   place: 'בילוי',
   recipe: 'מתכון',
   product: 'מוצר',
+  artist: 'אמן',
+  show: 'הופעה',
 }
 
+// פלטת התגים — משפחת כחול/שחור/ירקרק אחידה ואלגנטית
 export const TYPE_BADGE_STYLE = {
-  book: 'bg-amber-100 text-amber-800',
-  movie: 'bg-indigo-100 text-indigo-700',
-  series: 'bg-teal-100 text-teal-700',
-  place: 'bg-emerald-100 text-emerald-700',
-  recipe: 'bg-rose-100 text-rose-700',
-  product: 'bg-sky-100 text-sky-700',
+  book: 'bg-slate-200 text-slate-700',
+  movie: 'bg-blue-100 text-blue-800',
+  series: 'bg-cyan-100 text-cyan-800',
+  place: 'bg-emerald-100 text-emerald-800',
+  recipe: 'bg-teal-100 text-teal-800',
+  product: 'bg-sky-100 text-sky-800',
+  artist: 'bg-blue-200 text-blue-900',
+  show: 'bg-teal-200 text-teal-900',
 }
 
-export const CREATOR_LABEL = { book: 'מחבר/ת', movie: 'במאי/ת', series: 'יוצר/ת' }
+export const CREATOR_LABEL = { book: 'מחבר/ת', movie: 'במאי/ת', series: 'יוצר/ת', show: 'מבצע/ת' }
 
-// חמש קטגוריות האפליקציה — מסך הבית והניווט נבנים מכאן
+// שש קטגוריות האפליקציה — מסך הבית והניווט נבנים מכאן
 export const CATEGORIES = [
   {
     id: 'books',
@@ -35,7 +40,7 @@ export const CATEGORIES = [
     sub: 'ספרים',
     emoji: '📚',
     types: ['book'],
-    gradient: 'from-amber-400 to-orange-500',
+    gradient: 'from-slate-700 to-slate-900',
   },
   {
     id: 'screen',
@@ -43,7 +48,7 @@ export const CATEGORIES = [
     sub: 'סרטים וסדרות',
     emoji: '🎬',
     types: ['movie', 'series'],
-    gradient: 'from-indigo-500 to-violet-600',
+    gradient: 'from-blue-800 to-slate-950',
   },
   {
     id: 'places',
@@ -51,7 +56,7 @@ export const CATEGORIES = [
     sub: 'טיולים ומקומות',
     emoji: '🌄',
     types: ['place'],
-    gradient: 'from-emerald-400 to-teal-600',
+    gradient: 'from-teal-600 to-emerald-950',
   },
   {
     id: 'recipes',
@@ -59,7 +64,7 @@ export const CATEGORIES = [
     sub: 'מהמלצות ששלחו לי',
     emoji: '🍳',
     types: ['recipe'],
-    gradient: 'from-rose-400 to-pink-600',
+    gradient: 'from-cyan-700 to-slate-900',
   },
   {
     id: 'products',
@@ -67,7 +72,15 @@ export const CATEGORIES = [
     sub: 'קניות מומלצות',
     emoji: '🛍️',
     types: ['product'],
-    gradient: 'from-sky-500 to-blue-600',
+    gradient: 'from-sky-700 to-blue-950',
+  },
+  {
+    id: 'live',
+    label: 'הופעות חיות',
+    sub: 'מוזיקה, תיאטרון והקרנות',
+    emoji: '🎤',
+    types: ['artist', 'show'],
+    gradient: 'from-emerald-600 to-teal-950',
   },
 ]
 
@@ -78,6 +91,20 @@ const STATUS_LABELS = {
   place: { 'רוצה': 'רוצים ללכת', 'בתהליך': 'בתכנון', 'הושלם': 'היינו', 'נטשתי': 'ירד מהפרק' },
   recipe: { 'רוצה': 'לנסות', 'בתהליך': 'בהכנה', 'הושלם': 'ניסינו', 'נטשתי': 'לא עבד' },
   product: { 'רוצה': 'לקנות', 'בתהליך': 'בהתלבטות', 'הושלם': 'נקנה', 'נטשתי': 'ויתרנו' },
+  artist: { 'רוצה': 'לגלות', 'בתהליך': 'מקשיב/ה', 'הושלם': 'מכיר/ה', 'נטשתי': 'לא בשבילי' },
+  show: { 'רוצה': 'רוצים ללכת', 'בתהליך': 'נרכש כרטיס', 'הושלם': 'היינו', 'נטשתי': 'ירד מהפרק' },
 }
 
 export const statusLabel = (type, status) => STATUS_LABELS[type]?.[status] || status
+
+// מיון בתוך קטגוריה
+export const SORT_OPTIONS = [
+  { value: 'recent', label: 'החדש ביותר' },
+  { value: 'title', label: 'לפי שם' },
+  { value: 'rating', label: 'לפי דירוג' },
+]
+
+export const SORT_OPTIONS_LIVE = [
+  { value: 'date', label: 'לפי תאריך' },
+  ...SORT_OPTIONS,
+]

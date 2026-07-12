@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, ArrowDownWideNarrow } from 'lucide-react'
 import { PLATFORMS } from '../data/platforms'
+import { SORT_OPTIONS, SORT_OPTIONS_LIVE } from '../data/constants'
 import {
   PLACE_TYPES,
   AUDIENCES,
@@ -9,13 +10,22 @@ import {
   KASHRUT,
   RECIPE_TAGS,
   PRODUCT_CATEGORIES,
+  MUSIC_GENRES,
+  SHOW_TYPES,
 } from '../data/taxonomies'
 
-const SCREEN_TYPE_OPTIONS = [
-  { value: 'all', label: 'הכול' },
-  { value: 'movie', label: 'סרטים' },
-  { value: 'series', label: 'סדרות' },
-]
+const TYPE_TOGGLE_OPTIONS = {
+  screen: [
+    { value: 'all', label: 'הכול' },
+    { value: 'movie', label: 'סרטים' },
+    { value: 'series', label: 'סדרות' },
+  ],
+  live: [
+    { value: 'all', label: 'הכול' },
+    { value: 'artist', label: 'אמנים' },
+    { value: 'show', label: 'הופעות' },
+  ],
+}
 
 function Chip({ active, onClick, children, color }) {
   return (
@@ -23,7 +33,7 @@ function Chip({ active, onClick, children, color }) {
       onClick={onClick}
       className={`shrink-0 flex items-center gap-1.5 text-xs rounded-full px-3 py-1 border font-semibold transition ${
         active
-          ? 'bg-indigo-600 border-indigo-600 text-white'
+          ? 'bg-teal-700 border-teal-700 text-white'
           : 'bg-white border-slate-200 text-slate-600'
       }`}
     >
@@ -66,12 +76,17 @@ function rowsFor(mode, genres) {
       ]
     case 'products':
       return [{ key: 'productCategory', label: 'קטגוריה', options: PRODUCT_CATEGORIES }]
+    case 'live':
+      return [
+        { key: 'genre', label: 'סגנון', options: MUSIC_GENRES },
+        { key: 'showType', label: 'סוג', options: SHOW_TYPES },
+      ]
     default:
       return []
   }
 }
 
-export default function FiltersBar({ mode, items, filters, setFilters, shownCount }) {
+export default function FiltersBar({ mode, items, filters, setFilters, sort, setSort, shownCount }) {
   const genres = useMemo(
     () =>
       [...new Set(items.flatMap((i) => i.genres || []))].sort((a, b) => a.localeCompare(b, 'he')),
@@ -82,6 +97,8 @@ export default function FiltersBar({ mode, items, filters, setFilters, shownCoun
     setFilters((f) => ({ ...f, [key]: f[key] === value ? null : value }))
 
   const rows = rowsFor(mode, genres).filter((r) => r.options.length > 0)
+  const typeOptions = TYPE_TOGGLE_OPTIONS[mode]
+  const sortOptions = mode === 'live' ? SORT_OPTIONS_LIVE : SORT_OPTIONS
 
   return (
     <div
@@ -91,9 +108,9 @@ export default function FiltersBar({ mode, items, filters, setFilters, shownCoun
       <div className="max-w-lg mx-auto px-3 py-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
-          {mode === 'screen' ? (
+          {typeOptions ? (
             <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              {SCREEN_TYPE_OPTIONS.map((opt) => (
+              {typeOptions.map((opt) => (
                 <Chip
                   key={opt.value}
                   active={(filters.type || 'all') === opt.value}
@@ -109,6 +126,22 @@ export default function FiltersBar({ mode, items, filters, setFilters, shownCoun
           <span className="ms-auto text-[11px] text-slate-400 shrink-0 font-semibold">
             {shownCount} פריטים
           </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <ArrowDownWideNarrow className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="text-[11px] font-bold text-slate-400 shrink-0">מיון:</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg px-2 py-1 border-0 focus:outline-teal-600"
+          >
+            {sortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {rows.map((row) => (

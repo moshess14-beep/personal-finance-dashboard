@@ -8,14 +8,18 @@ const EMOJI = {
   place: '🌄',
   recipe: '🍳',
   product: '🛍️',
+  artist: '🎤',
+  show: '🎫',
 }
 const GRADIENT = {
-  book: 'from-amber-200 to-orange-400',
-  movie: 'from-indigo-300 to-violet-500',
-  series: 'from-teal-300 to-cyan-500',
-  place: 'from-emerald-300 to-teal-500',
-  recipe: 'from-rose-300 to-pink-500',
-  product: 'from-sky-300 to-blue-500',
+  book: 'from-slate-600 to-slate-800',
+  movie: 'from-blue-700 to-slate-900',
+  series: 'from-blue-600 to-cyan-800',
+  place: 'from-teal-500 to-emerald-800',
+  recipe: 'from-cyan-600 to-slate-800',
+  product: 'from-sky-600 to-blue-900',
+  artist: 'from-emerald-500 to-teal-800',
+  show: 'from-teal-600 to-slate-900',
 }
 
 export default function Cover({ item, className = '', emojiSize = 'text-3xl' }) {
