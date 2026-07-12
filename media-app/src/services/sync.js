@@ -93,6 +93,12 @@ async function pullAndMerge(supabase, userId) {
     .upsert({ user_id: userId, data: mergedSettings, updated_at: new Date().toISOString() })
 }
 
+// שם פונקציית ה-Edge בפועל בפרויקט Supabase. שים לב: לוח הבקרה של Supabase לא תמיד
+// מכבד את השם שמוזן בשדה "Function name" לפני הפריסה — לפעמים נשאר השם האוטומטי
+// שהוצע (כמו "clever-worker"). אם זה קורה, אין צורך לפרוס מחדש: פשוט מעדכנים כאן
+// את השם לזה שמופיע בפועל בכתובת ה-Invoke בלוח הבקרה.
+const AI_FUNCTION_NAME = 'clever-worker'
+
 // מפעיל את הזיהוי החכם המובנה: מכאן ואילך קריאות ה-AI עוברות דרך פונקציית ה-Edge
 // של הפרויקט (שמחזיקה את מפתח ה-Gemini בשרת), כך שאין צורך להזין מפתח בכל מכשיר.
 function enableAiProxy(supabase) {
@@ -100,7 +106,7 @@ function enableAiProxy(supabase) {
   if (!supabaseUrl) return
   setAiProxy({
     supabase,
-    functionsUrl: `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/gemini`,
+    functionsUrl: `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/${AI_FUNCTION_NAME}`,
     anonKey: supabaseAnonKey,
   })
 }

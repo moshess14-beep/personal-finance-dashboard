@@ -11,6 +11,13 @@
 1. פותחים את הפרויקט ב-[supabase.com](https://supabase.com) → **Edge Functions**.
 2. **Create a new function**, קוראים לה בדיוק `gemini`.
 3. מדביקים את כל תוכן `gemini/index.ts` לעורך ולוחצים **Deploy**.
+
+   > **שימו לב:** לפעמים לוח הבקרה של Supabase לא מכבד את השם שהוזן בשדה
+   > "Function name" לפני הפריסה, ומשאיר את השם האוטומטי שהוצע (למשל
+   > `clever-worker`). בודקים בכתובת ה-**Invoke function** בעמוד הפונקציה מה השם
+   > בפועל, ואם הוא שונה מ-`gemini` — מעדכנים את הקבוע `AI_FUNCTION_NAME` בראש
+   > `src/services/sync.js` לשם הנכון.
+
 4. **Edge Functions → Secrets** (או Project Settings → Edge Functions) → מוסיפים סוד:
    - שם: `GEMINI_API_KEY`
    - ערך: מפתח Gemini חינמי מ-[aistudio.google.com](https://aistudio.google.com) → *Get API key*.
