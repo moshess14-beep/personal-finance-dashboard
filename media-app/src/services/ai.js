@@ -4,11 +4,21 @@ import { DEMO } from './env'
 import { resizeImage } from './images'
 import { demoAnalyze } from '../data/demoData'
 
-const MODEL = 'gemini-2.0-flash'
+// כמה שמות מודל, לפי סדר עדיפות — ננסה את הבא רק אם הנוכחי "לא קיים" (404),
+// כדי לשרוד שינויי גרסאות מצד גוגל בלי לשבור את האפליקציה.
+const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
 
-async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
+// שגיאה עם פירוט טכני, כדי שאפשר יהיה להציג למשתמש מה בדיוק השתבש
+export class AiError extends Error {
+  constructor(message, detail) {
+    super(message)
+    this.detail = detail
+  }
+}
+
+async function callModel(model, apiKey, parts, maxOutputTokens) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -22,16 +32,67 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
       }),
     },
   )
-  if (!res.ok) throw new Error(`ai http ${res.status}`)
+  if (!res.ok) {
+    let bodyText = ''
+    try {
+      bodyText = (await res.text()).slice(0, 300)
+    } catch {
+      // אין מה לעשות אם גם קריאת גוף התשובה נכשלת
+    }
+    const err = new Error(`http ${res.status}`)
+    err.status = res.status
+    err.bodyText = bodyText
+    throw err
+  }
   const json = await res.json()
-  const text = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('')
-  return JSON.parse(text.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim())
+  const candidate = json.candidates?.[0]
+  const finishReason = candidate?.finishReason
+  const text = (candidate?.content?.parts || []).map((p) => p.text || '').join('')
+  if (!text) {
+    const err = new Error(`empty response (finishReason: ${finishReason || 'none'})`)
+    err.finishReason = finishReason
+    throw err
+  }
+  try {
+    return JSON.parse(text.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim())
+  } catch {
+    const err = new Error('bad json in response')
+    err.bodyText = text.slice(0, 300)
+    throw err
+  }
+}
+
+async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
+  let lastErr
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      return await callModel(model, apiKey, parts, maxOutputTokens)
+    } catch (e) {
+      lastErr = e
+      if (e.status !== 404) break // רק "מודל לא נמצא" מצדיק ניסיון עם מודל אחר
+    }
+  }
+  const status = lastErr?.status
+  let userMessage
+  if (status === 400) userMessage = 'המפתח לא תקין (בקשה שגויה) — ודאו שהעתקתם אותו במלואו'
+  else if (status === 401 || status === 403)
+    userMessage = 'המפתח נדחה — ייתכן שהוא שגוי, לא הופעל, או שהמכסה החינמית נגמרה'
+  else if (status === 429) userMessage = 'חריגה ממכסת הבקשות החינמית לעת עתה — נסו שוב בעוד כמה דקות'
+  else if (status) userMessage = `שגיאת שרת (${status})`
+  else userMessage = 'לא הצלחתי להתחבר לשירות הזיהוי (בעיית רשת)'
+  throw new AiError(userMessage, [
+    lastErr?.message,
+    lastErr?.status ? `status ${lastErr.status}` : null,
+    lastErr?.bodyText,
+  ]
+    .filter(Boolean)
+    .join(' · '))
 }
 
 // ניתוח צילום מסך: זיהוי קטגוריה + חילוץ פרטים, בקריאה אחת
 export async function analyzeImage(file, apiKey) {
   if (DEMO) return demoAnalyze()
-  if (!apiKey) throw new Error('no ai key')
+  if (!apiKey) throw new AiError('לא הוזן מפתח AI', 'no key')
 
   const blob = await resizeImage(file, 1024, 0.8)
   const base64 = await blobToBase64(blob)
@@ -49,13 +110,14 @@ export async function analyzeImage(file, apiKey) {
 "rawText":"הטקסט המרכזי שמופיע בתמונה, עד 300 תווים",
 "confidence":"high|medium|low"}
 כללי סיווג: ספר=book, סרט=movie, סדרת טלוויזיה=series, מקום בילוי/מסעדה/מלון/צימר/אטרקציה/מסלול=place, מתכון או מנה להכנה ביתית=recipe, מוצר לקנייה=product.
+זו יכולה להיות גם תמונת פוסטר/כריכה רשמית עם טקסט מעוצב או אלכסוני — קראו את הטקסט הוויזואלי בעיון, לא רק טקסט ישר.
 חשוב: אל תמציא שם שלא נרמז בתמונה. אם אינך בטוח בקטגוריה — unknown ו-confidence נמוך.`
 
   const result = await geminiJson(apiKey, [
     { text: prompt },
     { inlineData: { mimeType: 'image/jpeg', data: base64 } },
   ])
-  if (!result || typeof result !== 'object') throw new Error('ai bad response')
+  if (!result || typeof result !== 'object') throw new AiError('תשובה לא תקינה מהשירות', 'bad shape')
   return result
 }
 
@@ -99,6 +161,17 @@ export async function aiCompleteDetails(candidate, apiKey) {
   } catch {
     return candidate
   }
+}
+
+// בדיקת תקינות מהירה של המפתח, ללא תמונה — למסך ההגדרות
+export async function testAiKey(apiKey) {
+  if (DEMO) return true
+  if (!apiKey) throw new AiError('לא הוזן מפתח', 'no key')
+  const result = await geminiJson(apiKey, [
+    { text: 'החזר JSON בדיוק כך: {"ok":true}' },
+  ], 50)
+  if (!result?.ok) throw new AiError('תשובה לא צפויה מהשירות', JSON.stringify(result))
+  return true
 }
 
 function blobToBase64(blob) {

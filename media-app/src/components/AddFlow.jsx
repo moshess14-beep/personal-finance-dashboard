@@ -95,6 +95,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
 
     async function pipeline() {
       // שלב 1: ניתוח עם AI (אם יש מפתח) — מזהה קטגוריה ופרטים בבת אחת
+      let aiFailure = null
       if (aiKey || DEMO) {
         setStep('analyze')
         try {
@@ -102,13 +103,19 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           if (cancelled) return
           setAiInfo(info)
           if (routeAnalysis(info)) return
-        } catch {
-          // AI לא זמין — ממשיכים ל-OCR מקומי
+        } catch (e) {
+          aiFailure = e
         }
         if (cancelled) return
       }
-      // שלב 2: OCR מקומי
-      await ocrPipeline(cancelled ? () => true : () => cancelled)
+      // שלב 2: OCR מקומי (נופלים אליו גם אם ה-AI נכשל, וגם אם לא זיהה קטגוריה ברורה)
+      let aiNote = null
+      if (aiFailure) {
+        const detail = aiFailure.detail ? ` (${aiFailure.detail})` : ''
+        aiNote = `זיהוי ה-AI נכשל: ${aiFailure.message || 'שגיאה לא ידועה'}${detail}.`
+        setError(`${aiNote} ממשיך בקריאת טקסט בסיסית…`)
+      }
+      await ocrPipeline(cancelled ? () => true : () => cancelled, aiNote)
     }
 
     function routeAnalysis(info) {
@@ -147,7 +154,8 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       setStep('simple')
     }
 
-    async function ocrPipeline(isCancelled) {
+    async function ocrPipeline(isCancelled, aiNote) {
+      const withNote = (msg) => (aiNote ? `${aiNote} ${msg}` : msg)
       setStep('ocr')
       try {
         const text = await extractTextFromImage(file, (p) => !isCancelled() && setOcrProgress(p))
@@ -161,7 +169,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           return
         }
         if (lines.length === 0) {
-          setError('לא זוהה טקסט ברור בתמונה — אפשר להקליד את השם ידנית')
+          setError(withNote('לא זוהה טקסט ברור בתמונה — אפשר להקליד את השם ידנית'))
           return
         }
         setAutoSearching(true)
@@ -172,15 +180,16 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
             setResults(found)
             setAutoIdentified(true)
             setStep('results')
+            if (aiNote) setError(aiNote)
           } else {
-            setError('לא זיהיתי לבד — בחרו את השורה שהיא שם היצירה, או תקנו ידנית')
+            setError(withNote('לא זיהיתי לבד — בחרו את השורה שהיא שם היצירה, או תקנו ידנית'))
           }
         } catch {
-          if (!isCancelled()) setError('החיפוש ברשת נכשל — בחרו שורה או הקלידו את השם')
+          if (!isCancelled()) setError(withNote('החיפוש ברשת נכשל — בחרו שורה או הקלידו את השם'))
         }
         if (!isCancelled()) setAutoSearching(false)
       } catch {
-        if (!isCancelled()) setError('קריאת התמונה נכשלה — אפשר להקליד את השם ידנית')
+        if (!isCancelled()) setError(withNote('קריאת התמונה נכשלה — אפשר להקליד את השם ידנית'))
       }
     }
 
