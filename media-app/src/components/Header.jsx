@@ -1,7 +1,19 @@
-import { Settings } from 'lucide-react'
+import { Settings, Cloud, CloudOff, Loader2, CloudAlert } from 'lucide-react'
 import { DEMO } from '../services/env'
+import useLibraryStore from '../store/useLibraryStore'
+
+const SYNC_BADGE = {
+  synced: { Icon: Cloud, text: 'מסונכרן', cls: 'bg-emerald-500/20 text-emerald-200' },
+  syncing: { Icon: Loader2, text: 'מסנכרן…', cls: 'bg-white/15 text-white/80', spin: true },
+  connecting: { Icon: Loader2, text: 'מתחבר…', cls: 'bg-white/15 text-white/80', spin: true },
+  error: { Icon: CloudAlert, text: 'שגיאת סנכרון', cls: 'bg-rose-500/20 text-rose-200' },
+}
 
 export default function Header({ onSettings }) {
+  const authUser = useLibraryStore((s) => s.authUser)
+  const syncStatus = useLibraryStore((s) => s.syncStatus)
+  const badge = authUser ? SYNC_BADGE[syncStatus] : null
+
   return (
     <header className="bg-gradient-to-l from-slate-950 via-slate-900 to-teal-900 text-white">
       <div className="max-w-lg mx-auto px-4 pt-5 pb-4 flex items-start justify-between">
@@ -17,6 +29,20 @@ export default function Header({ onSettings }) {
           <p className="text-xs text-white/80 mt-1">
             קריאה · צפייה · בילויים · מתכונים · מוצרים · הופעות חיות
           </p>
+          {badge && (
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 mt-1.5 ${badge.cls}`}
+            >
+              <badge.Icon className={`w-3 h-3 ${badge.spin ? 'animate-spin' : ''}`} />
+              {badge.text}
+            </span>
+          )}
+          {!authUser && !DEMO && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 mt-1.5 bg-white/10 text-white/60">
+              <CloudOff className="w-3 h-3" />
+              לא מסונכרן
+            </span>
+          )}
         </div>
         <button
           onClick={onSettings}
