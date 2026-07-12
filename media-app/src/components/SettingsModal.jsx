@@ -47,7 +47,7 @@ export default function SettingsModal({ onClose }) {
 
         <div>
           <div className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-indigo-500" />
+            <Sparkles className="w-4 h-4 text-teal-600" />
             מפתח AI — זיהוי תמונות חכם (מומלץ מאוד!)
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
@@ -61,7 +61,7 @@ export default function SettingsModal({ onClose }) {
               onChange={(e) => setGKey(e.target.value)}
               placeholder="הדביקו כאן את מפתח ה-Gemini…"
               dir="ltr"
-              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
             />
             <button
               onClick={() => {
@@ -69,7 +69,7 @@ export default function SettingsModal({ onClose }) {
                 setGSaved(true)
                 setTimeout(() => setGSaved(false), 1500)
               }}
-              className="bg-indigo-600 text-white rounded-xl px-4 text-sm font-bold"
+              className="bg-teal-700 text-white rounded-xl px-4 text-sm font-bold"
             >
               {gSaved ? '✓ נשמר' : 'שמירה'}
             </button>
@@ -77,7 +77,7 @@ export default function SettingsModal({ onClose }) {
           <button
             onClick={runTest}
             disabled={testing || !gKey.trim()}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 disabled:opacity-50 rounded-xl py-2"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 disabled:opacity-50 rounded-xl py-2"
           >
             {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             בדיקת חיבור
@@ -111,7 +111,7 @@ export default function SettingsModal({ onClose }) {
               onChange={(e) => setKey(e.target.value)}
               placeholder="הדביקו כאן את המפתח…"
               dir="ltr"
-              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
             />
             <button
               onClick={() => {
@@ -119,7 +119,7 @@ export default function SettingsModal({ onClose }) {
                 setSaved(true)
                 setTimeout(() => setSaved(false), 1500)
               }}
-              className="bg-indigo-600 text-white rounded-xl px-4 text-sm font-bold"
+              className="bg-teal-700 text-white rounded-xl px-4 text-sm font-bold"
             >
               {saved ? '✓ נשמר' : 'שמירה'}
             </button>
@@ -134,7 +134,7 @@ export default function SettingsModal({ onClose }) {
           <div className="flex gap-2">
             <button
               onClick={seedDemo}
-              className="flex-1 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5"
+              className="flex-1 text-xs font-bold text-teal-700 bg-teal-50 rounded-xl py-2.5"
             >
               טעינת נתוני דוגמה
             </button>

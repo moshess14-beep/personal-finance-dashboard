@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Star, Trash2, RefreshCw, Loader2, MapPin, ExternalLink } from 'lucide-react'
+import { Star, Trash2, RefreshCw, Loader2, MapPin, ExternalLink, Ticket, Music } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
 import useLibraryStore from '../store/useLibraryStore'
 import { fetchAvailability } from '../services/search'
 import { useItemImage, deleteImage } from '../services/images'
 import { mapsSearchUrl } from '../services/places'
+import { youtubeSearchUrl, spotifySearchUrl, googleSearchUrl } from '../services/links'
+import { daysUntilLabel, formatEventDate } from '../utils/dates'
 import {
   STATUSES,
   TYPE_LABEL,
@@ -22,6 +24,8 @@ import {
   KASHRUT,
   RECIPE_TAGS,
   PRODUCT_CATEGORIES,
+  MUSIC_GENRES,
+  SHOW_TYPES,
 } from '../data/taxonomies'
 
 function ToggleChips({ label, options, selected, onToggle, single }) {
@@ -36,7 +40,7 @@ function ToggleChips({ label, options, selected, onToggle, single }) {
             onClick={() => onToggle(opt)}
             className={`text-xs rounded-full px-3 py-1.5 border font-semibold transition ${
               isSelected(opt)
-                ? 'bg-indigo-600 border-indigo-600 text-white'
+                ? 'bg-teal-700 border-teal-700 text-white'
                 : 'bg-white border-slate-200 text-slate-400'
             }`}
           >
@@ -47,6 +51,8 @@ function ToggleChips({ label, options, selected, onToggle, single }) {
     </div>
   )
 }
+
+const HAS_ADDRESS = ['place', 'show']
 
 export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
@@ -60,6 +66,7 @@ export default function ItemDetail({ item, onClose }) {
   const isScreen = item.type === 'movie' || item.type === 'series'
   const availability = item.availability || []
   const storedImage = useItemImage(item.imageId)
+  const dateBadge = item.type === 'show' ? daysUntilLabel(item.eventDate) : null
 
   const toggleMulti = (key) => (opt) => {
     const current = item[key] || []
@@ -109,10 +116,12 @@ export default function ItemDetail({ item, onClose }) {
       : null,
     item.type === 'product' && item.price ? `₪${item.price}` : null,
     item.type === 'product' && item.store ? item.store : null,
+    item.type === 'show' && item.showType ? item.showType : null,
+    item.type === 'show' && item.price ? `₪${item.price} לכרטיס` : null,
   ].filter(Boolean)
 
   const mapsHref =
-    item.type === 'place'
+    HAS_ADDRESS.includes(item.type) && (item.address || item.mapsUrl)
       ? item.mapsUrl || mapsSearchUrl(`${item.titleHe} ${item.address || ''}`.trim())
       : null
 
@@ -139,10 +148,16 @@ export default function ItemDetail({ item, onClose }) {
                 {item.creator}
               </div>
             )}
+            {dateBadge && (
+              <div className="text-xs font-bold text-teal-700 mt-1">
+                {formatEventDate(item.eventDate)}
+                {item.eventTime ? ` · ${item.eventTime}` : ''} · {dateBadge.text}
+              </div>
+            )}
             {metaParts.length > 0 && (
               <div className="text-xs text-slate-500 mt-1">{metaParts.join(' · ')}</div>
             )}
-            {item.type === 'place' && item.address && (
+            {HAS_ADDRESS.includes(item.type) && item.address && (
               <div className="text-xs text-slate-500 mt-1 flex items-start gap-1">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
                 <span className="line-clamp-2">{item.address}</span>
@@ -165,7 +180,7 @@ export default function ItemDetail({ item, onClose }) {
           </div>
         </div>
 
-        {(item.type === 'place' || item.type === 'product') && (
+        {(item.type === 'place' || item.type === 'product' || item.type === 'show') && (
           <div className="flex gap-2">
             {mapsHref && (
               <a
@@ -183,12 +198,46 @@ export default function ItemDetail({ item, onClose }) {
                 href={item.buyUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-sky-600 rounded-2xl py-2.5"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-blue-700 rounded-2xl py-2.5"
               >
                 <ExternalLink className="w-4 h-4" />
                 לקנייה
               </a>
             )}
+            {item.type === 'show' && (
+              <a
+                href={item.ticketUrl || googleSearchUrl(`${item.titleHe} כרטיסים`)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-blue-700 rounded-2xl py-2.5"
+              >
+                <Ticket className="w-4 h-4" />
+                {item.ticketUrl ? 'לרכישת כרטיסים' : 'חיפוש כרטיסים'}
+              </a>
+            )}
+          </div>
+        )}
+
+        {item.type === 'artist' && (
+          <div className="flex gap-2">
+            <a
+              href={spotifySearchUrl(item.titleHe)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-emerald-600 rounded-2xl py-2.5"
+            >
+              <Music className="w-4 h-4" />
+              ספוטיפיי
+            </a>
+            <a
+              href={youtubeSearchUrl(item.titleHe)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-blue-700 rounded-2xl py-2.5"
+            >
+              <ExternalLink className="w-4 h-4" />
+              יוטיוב
+            </a>
           </div>
         )}
 
@@ -226,7 +275,7 @@ export default function ItemDetail({ item, onClose }) {
                 onClick={() => updateItem(item.id, { status: s })}
                 className={`flex-1 text-xs rounded-xl py-2 border font-bold transition ${
                   item.status === s
-                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                    ? 'bg-teal-700 border-teal-700 text-white'
                     : 'bg-white border-slate-200 text-slate-500'
                 }`}
               >
@@ -297,6 +346,50 @@ export default function ItemDetail({ item, onClose }) {
           </>
         )}
 
+        {item.type === 'artist' && (
+          <ToggleChips label="סגנון" options={MUSIC_GENRES} selected={item.genres} onToggle={toggleMulti('genres')} />
+        )}
+
+        {item.type === 'show' && (
+          <>
+            <ToggleChips label="סוג" options={SHOW_TYPES} selected={item.showType} onToggle={toggleSingle('showType')} single />
+            <div className="grid grid-cols-2 gap-2">
+              <EditableField
+                label="תאריך"
+                type="date"
+                value={item.eventDate || ''}
+                onSave={(v) => updateItem(item.id, { eventDate: v })}
+              />
+              <EditableField
+                label="שעה"
+                type="time"
+                value={item.eventTime || ''}
+                onSave={(v) => updateItem(item.id, { eventTime: v })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <EditableField
+                label="מבצע/ת"
+                value={item.creator || ''}
+                onSave={(v) => updateItem(item.id, { creator: v.trim() })}
+              />
+              <EditableField
+                label="מחיר כרטיס (₪)"
+                type="number"
+                value={item.price ?? ''}
+                onSave={(v) => updateItem(item.id, { price: parseFloat(v) || null })}
+              />
+            </div>
+            <EditableField
+              label="קישור לכרטיסים"
+              value={item.ticketUrl || ''}
+              dir="ltr"
+              placeholder="https://..."
+              onSave={(v) => updateItem(item.id, { ticketUrl: v.trim() })}
+            />
+          </>
+        )}
+
         {isScreen && (
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -306,7 +399,7 @@ export default function ItemDetail({ item, onClose }) {
               <button
                 onClick={checkAvailability}
                 disabled={checking}
-                className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-full px-2.5 py-1 disabled:opacity-50"
+                className="flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 rounded-full px-2.5 py-1 disabled:opacity-50"
               >
                 {checking ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -369,7 +462,7 @@ export default function ItemDetail({ item, onClose }) {
             onBlur={() => updateItem(item.id, { myNote: note })}
             rows={2}
             placeholder="מי המליץ? למה שווה? …"
-            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
           />
         </div>
 
@@ -407,7 +500,7 @@ function EditableField({ label, value, onSave, type = 'text', dir, placeholder }
         placeholder={placeholder}
         onChange={(e) => setV(e.target.value)}
         onBlur={() => onSave(v)}
-        className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+        className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
       />
     </div>
   )

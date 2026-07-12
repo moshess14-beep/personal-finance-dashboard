@@ -19,11 +19,13 @@ const STEP_TITLE = {
   results: 'האם התכוונת ל…?',
   confirm: 'בדיקת הפרטים לפני שמירה',
   simple: 'פרטי ההמלצה',
+  liveChoice: 'אמן או הופעה?',
 }
 
 // קטגוריה → סוג פריט של הטופס הפשוט
 const SIMPLE_TYPE = { places: 'place', recipes: 'recipe', products: 'product' }
 const SIMPLE_TYPES = ['place', 'recipe', 'product']
+const LIVE_TYPES = ['artist', 'show']
 
 function candidateToForm(c, identification) {
   return {
@@ -68,10 +70,13 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
   const addItem = useLibraryStore((s) => s.addItem)
 
   const simpleHint = SIMPLE_TYPE[category] || null
+  const categoryIsLive = category === 'live'
 
   const [step, setStep] = useState(() => {
     if (mode === 'image') return aiKey || DEMO ? 'analyze' : 'ocr'
-    return simpleHint ? 'simple' : 'query'
+    if (simpleHint) return 'simple'
+    if (categoryIsLive) return 'liveChoice'
+    return 'query'
   })
   const [imageUrl, setImageUrl] = useState(null)
   const [ocrProgress, setOcrProgress] = useState(0)
@@ -126,6 +131,16 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
         openSimple(simpleHint, info, title)
         return true
       }
+      // ה-AI זיהה בבירור אמן או הופעה — פותחים ישר, בלי לשאול
+      if (LIVE_TYPES.includes(cat) && title) {
+        openSimple(cat, info, title)
+        return true
+      }
+      // נפתח מתוך קטגוריית הופעות חיות אבל ה-AI לא הכריע בין אמן להופעה
+      if (categoryIsLive) {
+        setStep('liveChoice')
+        return true
+      }
       if (['book', 'movie', 'series'].includes(cat) && title) {
         setQuery(title)
         setAutoIdentified(true)
@@ -166,6 +181,10 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
         if (simpleHint) {
           setSimple({ type: simpleHint, init: { sourceText: text, price: guessPrice(text) } })
           setStep('simple')
+          return
+        }
+        if (categoryIsLive) {
+          setStep('liveChoice')
           return
         }
         if (lines.length === 0) {
@@ -336,19 +355,25 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
 
   const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const saveAsChips = !simpleHint && (
+  const saveAsChips = !simpleHint && !categoryIsLive && (
     <div className="pt-1">
       <div className="text-[11px] font-bold text-slate-400 mb-1.5">זו בכלל המלצה אחרת? שמרו כ:</div>
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
         {SIMPLE_TYPES.map((t) => (
           <button
             key={t}
             onClick={() => goSimple(t)}
-            className="flex-1 text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2"
+            className="text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2"
           >
             {{ place: '🌄 בילוי', recipe: '🍳 מתכון', product: '🛍️ מוצר' }[t]}
           </button>
         ))}
+        <button
+          onClick={() => setStep('liveChoice')}
+          className="text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2"
+        >
+          🎤 הופעה חיה
+        </button>
       </div>
     </div>
   )
@@ -370,7 +395,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
               alt="התמונה שהועלתה"
             />
           )}
-          <div className="flex items-center gap-2 text-sm text-indigo-600 font-semibold">
+          <div className="flex items-center gap-2 text-sm text-teal-700 font-semibold">
             <Sparkles className="w-4 h-4 animate-pulse" />
             מזהה את התמונה: מה זה, איזו קטגוריה, ואילו פרטים…
           </div>
@@ -394,7 +419,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-indigo-500 transition-all"
+                  className="h-full bg-teal-600 transition-all"
                   style={{ width: `${ocrProgress * 100}%` }}
                 />
               </div>
@@ -418,7 +443,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
                         onClick={() => setQuery(line)}
                         className={`text-xs rounded-full px-3 py-1.5 border font-semibold ${
                           query === line
-                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            ? 'bg-teal-700 border-teal-700 text-white'
                             : 'bg-slate-50 border-slate-200 text-slate-600'
                         }`}
                       >
@@ -461,7 +486,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       {step === 'results' && results && (
         <div className="space-y-4">
           {autoIdentified && (
-            <div className="bg-indigo-50 text-indigo-700 text-xs rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
+            <div className="bg-teal-50 text-teal-800 text-xs rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               זיהיתי אוטומטית מתוך התמונה — בחרו את ההתאמה הנכונה:
             </div>
@@ -507,7 +532,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
             </button>
             <button
               onClick={manualEntry}
-              className="flex-1 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5 flex items-center justify-center gap-1"
+              className="flex-1 text-xs font-bold text-teal-700 bg-teal-50 rounded-xl py-2.5 flex items-center justify-center gap-1"
             >
               <PencilLine className="w-3.5 h-3.5" />
               הזנה ידנית
@@ -533,7 +558,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
                     onClick={() => setForm((f) => ({ ...f, type: value }))}
                     className={`text-xs rounded-full px-3 py-1 border font-semibold ${
                       form.type === value
-                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                        ? 'bg-teal-700 border-teal-700 text-white'
                         : 'bg-white border-slate-200 text-slate-500'
                     }`}
                   >
@@ -579,7 +604,7 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
               value={form.summary}
               onChange={setF('summary')}
               rows={3}
-              className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+              className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
             />
           </div>
 
@@ -608,10 +633,41 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
 
           <button
             onClick={save}
-            className="w-full bg-indigo-600 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition"
+            className="w-full bg-teal-700 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition"
           >
             שמירה בספרייה
           </button>
+        </div>
+      )}
+
+      {step === 'liveChoice' && (
+        <div className="space-y-3">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              className="w-full max-h-44 object-contain rounded-xl bg-slate-100"
+              alt="התמונה שהועלתה"
+            />
+          )}
+          <p className="text-sm text-slate-500">איזה סוג המלצה זו?</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => goSimple('artist')}
+              className="bg-slate-50 border border-slate-200 rounded-2xl py-5 flex flex-col items-center gap-1.5 font-bold text-slate-700"
+            >
+              <span className="text-2xl">🎤</span>
+              אמן / להקה
+              <span className="text-[10px] font-normal text-slate-400">המלצה לגילוי, בלי תאריך</span>
+            </button>
+            <button
+              onClick={() => goSimple('show')}
+              className="bg-slate-50 border border-slate-200 rounded-2xl py-5 flex flex-col items-center gap-1.5 font-bold text-slate-700"
+            >
+              <span className="text-2xl">🎫</span>
+              הופעה קרובה
+              <span className="text-[10px] font-normal text-slate-400">קונצרט, תיאטרון, הקרנה…</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -644,12 +700,12 @@ function SearchBox({ query, setQuery, onSearch, busy, autoFocus, placeholder }) 
         onKeyDown={(e) => e.key === 'Enter' && onSearch()}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-indigo-400"
+        className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-teal-600"
       />
       <button
         onClick={onSearch}
         disabled={busy || !query.trim()}
-        className="bg-indigo-600 disabled:bg-slate-300 text-white rounded-xl px-4 flex items-center gap-1.5 text-sm font-bold"
+        className="bg-teal-700 disabled:bg-slate-300 text-white rounded-xl px-4 flex items-center gap-1.5 text-sm font-bold"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
         חיפוש
@@ -668,7 +724,7 @@ function CandidateGroup({ title, candidates, onPick, disabled }) {
             key={`${c.source}-${c.externalId ?? i}`}
             onClick={() => onPick(c)}
             disabled={disabled}
-            className="w-full flex items-center gap-3 text-right bg-slate-50 hover:bg-indigo-50 rounded-2xl p-2 transition disabled:opacity-50"
+            className="w-full flex items-center gap-3 text-right bg-slate-50 hover:bg-teal-50 rounded-2xl p-2 transition disabled:opacity-50"
           >
             <Cover item={c} className="w-11 aspect-[2/3] rounded-lg shrink-0" emojiSize="text-lg" />
             <div className="flex-1 min-w-0">
@@ -705,7 +761,7 @@ function Field({ label, value, onChange, type = 'text' }) {
         type={type}
         value={value}
         onChange={onChange}
-        className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-indigo-400"
+        className="w-full mt-0.5 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
       />
     </div>
   )

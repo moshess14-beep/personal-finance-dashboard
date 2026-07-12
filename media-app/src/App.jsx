@@ -26,6 +26,33 @@ const MATCHERS = {
   kashrut: (it, v) => it.kashrut === v,
   tag: (it, v) => (it.tags || []).includes(v),
   productCategory: (it, v) => it.productCategory === v,
+  showType: (it, v) => it.showType === v,
+}
+
+function sortItems(items, sort) {
+  const arr = [...items]
+  switch (sort) {
+    case 'title':
+      return arr.sort((a, b) => (a.titleHe || '').localeCompare(b.titleHe || '', 'he'))
+    case 'rating':
+      return arr.sort((a, b) => (b.myRating || 0) - (a.myRating || 0))
+    case 'date': {
+      // הופעות קרובות קודם (הקרובה ביותר ראשונה), אחריהן הופעות שעברו (האחרונה ראשונה),
+      // ובסוף פריטים בלי תאריך (אמנים), לפי החדש ביותר
+      const today = new Date().toISOString().slice(0, 10)
+      const withDate = arr.filter((x) => x.eventDate)
+      const noDate = arr.filter((x) => !x.eventDate)
+      const upcoming = withDate
+        .filter((x) => x.eventDate >= today)
+        .sort((a, b) => (a.eventDate < b.eventDate ? -1 : 1))
+      const past = withDate
+        .filter((x) => x.eventDate < today)
+        .sort((a, b) => (a.eventDate > b.eventDate ? -1 : 1))
+      return [...upcoming, ...past, ...noDate]
+    }
+    default:
+      return arr // 'recent' — הסדר המקורי כבר מהחדש לישן
+  }
 }
 
 export default function App() {
@@ -35,6 +62,7 @@ export default function App() {
 
   const [view, setView] = useState(null) // null (מסך פתיחה) | מזהה קטגוריה
   const [filters, setFilters] = useState({})
+  const [sort, setSort] = useState('recent')
   const [addFlow, setAddFlow] = useState(null) // {mode, file?, category?}
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [openItemId, setOpenItemId] = useState(null)
@@ -75,10 +103,13 @@ export default function App() {
     [categoryItems, filters],
   )
 
+  const sorted = useMemo(() => sortItems(filtered, sort), [filtered, sort])
+
   const openItem = items.find((it) => it.id === openItemId)
 
   const openCategory = (id) => {
     setFilters({})
+    setSort(id === 'live' ? 'date' : 'recent')
     setView(id)
   }
 
@@ -108,7 +139,7 @@ export default function App() {
         ) : (
           <CategoryView
             view={view}
-            items={filtered}
+            items={sorted}
             totalCount={categoryItems.length}
             onBack={() => setView(null)}
             onOpenItem={setOpenItemId}
@@ -123,11 +154,13 @@ export default function App() {
             items={categoryItems}
             filters={filters}
             setFilters={setFilters}
-            shownCount={filtered.length}
+            sort={sort}
+            setSort={setSort}
+            shownCount={sorted.length}
           />
           <button
             onClick={() => setShowAddChooser(true)}
-            className="fixed bottom-40 start-4 z-30 p-3.5 rounded-full bg-indigo-600 text-white shadow-lg active:scale-95 transition"
+            className="fixed bottom-40 start-4 z-30 p-3.5 rounded-full bg-teal-700 text-white shadow-lg active:scale-95 transition"
             aria-label="הוספת פריט"
           >
             <Plus className="w-6 h-6" />

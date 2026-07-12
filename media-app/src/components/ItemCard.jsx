@@ -2,6 +2,7 @@ import { Star } from 'lucide-react'
 import Cover from './Cover'
 import { STATUS_STYLE, statusLabel } from '../data/constants'
 import { PLATFORM_BY_ID } from '../data/platforms'
+import { daysUntilLabel } from '../utils/dates'
 
 function metaLine(item) {
   const parts = []
@@ -31,6 +32,13 @@ function metaLine(item) {
       if (item.price) parts.push(`₪${item.price}`)
       if (item.store) parts.push(item.store)
       break
+    case 'artist':
+      if (item.genres?.length) parts.push(item.genres[0])
+      break
+    case 'show':
+      if (item.showType) parts.push(item.showType)
+      if (item.creator) parts.push(item.creator)
+      break
   }
   return parts.join(' · ')
 }
@@ -41,7 +49,16 @@ function chips(item) {
   return item.genres || []
 }
 
+const DATE_BADGE_STYLE = {
+  today: 'bg-teal-700 text-white',
+  soon: 'bg-emerald-100 text-emerald-800',
+  later: 'bg-slate-100 text-slate-500',
+  past: 'bg-slate-100 text-slate-400',
+}
+
 export default function ItemCard({ item, onOpen }) {
+  const dateBadge = item.type === 'show' ? daysUntilLabel(item.eventDate) : null
+
   return (
     <button
       onClick={onOpen}
@@ -53,6 +70,14 @@ export default function ItemCard({ item, onOpen }) {
           {item.titleHe}
         </div>
         <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{metaLine(item)}</div>
+
+        {dateBadge && (
+          <span
+            className={`inline-block text-[10px] rounded-full px-1.5 py-0.5 font-bold mt-1 ${DATE_BADGE_STYLE[dateBadge.tone]}`}
+          >
+            {dateBadge.text}
+          </span>
+        )}
 
         {chips(item).length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
