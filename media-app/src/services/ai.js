@@ -4,9 +4,9 @@ import { DEMO } from './env'
 import { resizeImage } from './images'
 import { demoAnalyze } from '../data/demoData'
 
-// כמה שמות מודל, לפי סדר עדיפות — ננסה את הבא רק אם הנוכחי "לא קיים" (404),
-// כדי לשרוד שינויי גרסאות מצד גוגל בלי לשבור את האפליקציה.
-const MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+// כמה שמות מודל, לפי סדר עדיפות. gemini-2.0-flash קודם — המכסה החינמית שלו
+// הכי יציבה ומוכחת; מודלים חדשים יותר (2.5) עשויים לקבל מכסת חינם נמוכה/שונה.
+const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
 
 // שגיאה עם פירוט טכני, כדי שאפשר יהיה להציג למשתמש מה בדיוק השתבש
 export class AiError extends Error {
@@ -69,7 +69,9 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 800) {
       return await callModel(model, apiKey, parts, maxOutputTokens)
     } catch (e) {
       lastErr = e
-      if (e.status !== 404) break // רק "מודל לא נמצא" מצדיק ניסיון עם מודל אחר
+      // 404 = המודל הזה לא קיים; 429 = יכול להיות מכסה ספציפית לדגם הזה —
+      // בשני המקרים שווה לנסות את המודל הבא ברשימה לפני שמוותרים.
+      if (e.status !== 404 && e.status !== 429) break
     }
   }
   const status = lastErr?.status
