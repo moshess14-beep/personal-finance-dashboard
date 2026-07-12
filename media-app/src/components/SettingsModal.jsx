@@ -88,6 +88,17 @@ export default function SettingsModal({ onClose }) {
                   ולוחצים Deploy
                 </li>
                 <li>
+                  לב שים: לפעמים Supabase לא משנה את הכתובת בפועל לשם שהזנתם — בודקים בכתובת
+                  ה-Invoke בעמוד הפונקציה מה השם האמיתי, ומעדכנים בהתאם את מפתח הקבוע{' '}
+                  <code dir="ltr" className="bg-slate-100 rounded px-1">
+                    AI_FUNCTION_NAME
+                  </code>{' '}
+                  בקובץ{' '}
+                  <code dir="ltr" className="bg-slate-100 rounded px-1">
+                    src/services/sync.js
+                  </code>
+                </li>
+                <li>
                   ב-Edge Functions → Secrets מוסיפים סוד בשם{' '}
                   <code dir="ltr" className="bg-slate-100 rounded px-1">
                     GEMINI_API_KEY
