@@ -109,7 +109,8 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       if (aiKey || DEMO) {
         setStep('analyze')
         try {
-          const info = await analyzeImage(file, aiKey)
+          const genericCats = categories.filter((c) => !c.builtin).map((c) => ({ id: c.id, label: c.label }))
+          const info = await analyzeImage(file, aiKey, genericCats)
           if (cancelled) return
           setAiInfo(info)
           if (routeAnalysis(info)) return
@@ -152,8 +153,10 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
         doSearch(title, info.altTitle)
         return true
       }
+      // ה-AI מחזיר עכשיו את המזהה המדויק של הקטגוריה הכללית (דינמי, כולל קטגוריות שהמשתמש הוסיף/שינה שם) —
+      // עם fallback לשמות הישנים הקבועים למקרה של תשובה ממטמון/מודל ישן.
       const seedId = GENERIC_SEED_MAP[cat]
-      const target = seedId && categories.find((c) => c.id === seedId)
+      const target = categories.find((c) => !c.builtin && (c.id === cat || c.id === seedId))
       if (target && title) {
         openGenericWithInfo(target, info, title)
         return true

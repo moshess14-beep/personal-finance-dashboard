@@ -166,27 +166,34 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
     .join(' · '))
 }
 
-// ניתוח צילום מסך: זיהוי קטגוריה + חילוץ פרטים, בקריאה אחת
-export async function analyzeImage(file, apiKey) {
+// ניתוח צילום מסך: זיהוי קטגוריה + חילוץ פרטים, בקריאה אחת.
+// genericCategories: רשימת הקטגוריות הכלליות הקיימות כרגע אצל המשתמש ({id,label}) —
+// מוזרקת דינמית כדי שה-AI יזהה גם קטגוריות חדשות/משונות-שם, לא רק רשימה קבועה בקוד.
+export async function analyzeImage(file, apiKey, genericCategories = []) {
   if (DEMO) return demoAnalyze()
   if (!apiKey) throw new AiError('לא הוזן מפתח AI', 'no key')
 
   const blob = await resizeImage(file, 1024, 0.8)
   const base64 = await blobToBase64(blob)
 
+  const genericIds = genericCategories.map((c) => c.id)
+  const genericEnum = genericIds.length ? genericIds.join('|') + '|' : ''
+  const genericList = genericCategories.map((c) => `${c.id}=${c.label}`).join(', ')
+
   const prompt = `זהו צילום מסך של המלצה ששלחו למשתמש ישראלי (מוואטסאפ, רשת חברתית או אתר).
 נתח את התמונה וחלץ את הפרטים. החזר JSON בלבד במבנה המדויק הזה:
-{"category":"book|movie|series|place|recipe|product|artist|show|unknown",
-"title":"השם המרכזי (של הספר/סרט/מקום/מתכון/מוצר/אמן/הופעה) בעברית כפי שמופיע או ידוע",
+{"category":"book|movie|series|artist|show|${genericEnum}unknown",
+"title":"השם המרכזי (של הספר/סרט/אמן/הופעה/הפריט) בעברית כפי שמופיע או ידוע",
 "altTitle":"השם באנגלית אם מופיע או ידוע לך בוודאות, אחרת מחרוזת ריקה",
 "creator":"מחבר/במאי/יוצר/מבצע אם מופיע או ידוע בוודאות, אחרת ריק",
 "year":מספר או null,
 "address":"אם זה מקום או הופעה — כתובת/יישוב/אולם, אחרת ריק",
 "price":מספר או null,
-"store":"אם זה מוצר — שם החנות/אתר אם מופיע, אחרת ריק",
+"store":"אם זה מוצר או פריט לקנייה — שם החנות/אתר אם מופיע, אחרת ריק",
 "rawText":"הטקסט המרכזי שמופיע בתמונה, עד 300 תווים",
 "confidence":"high|medium|low"}
-כללי סיווג: ספר=book, סרט=movie, סדרת טלוויזיה=series, מקום בילוי/מסעדה/מלון/צימר/אטרקציה/מסלול=place, מתכון או מנה להכנה ביתית=recipe, מוצר לקנייה=product, המלצה על אמן/זמר/להקה חדשים לגילוי (בלי אירוע קונקרטי)=artist, כרטיס/פרסום להופעה קונקרטית עם תאריך — קונצרט, הצגת תיאטרון, הקרנת קולנוע, סטנדאפ, מחול=show.
+כללי סיווג: ספר=book, סרט=movie, סדרת טלוויזיה=series, המלצה על אמן/זמר/להקה חדשים לגילוי (בלי אירוע קונקרטי)=artist, כרטיס/פרסום להופעה קונקרטית עם תאריך — קונצרט, הצגת תיאטרון, הקרנת קולנוע, סטנדאפ, מחול=show.
+בנוסף, למשתמש יש את הקטגוריות הכלליות הבאות (מזהה=שם): ${genericList || 'אין כרגע'}. אם התוכן מתאים לאחת מהן יותר מכל קטגוריה אחרת — החזר בשדה category את המזהה המדויק שלה (למשל "${genericIds[0] || 'places'}"), לא את השם שלה.
 זו יכולה להיות גם תמונת פוסטר/כריכה רשמית עם טקסט מעוצב או אלכסוני — קראו את הטקסט הוויזואלי בעיון, לא רק טקסט ישר.
 חשוב: אל תמציא שם שלא נרמז בתמונה. אם אינך בטוח בקטגוריה — unknown ו-confidence נמוך.`
 
