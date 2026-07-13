@@ -13,7 +13,6 @@ import {
   Undo2,
   Sparkles,
   ShoppingCart,
-  BadgeCheck,
 } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
@@ -21,10 +20,16 @@ import TagEditor from './TagEditor'
 import ImageGallery from './ImageGallery'
 import useLibraryStore from '../store/useLibraryStore'
 import { fetchAvailability } from '../services/search'
-import { aiWebEnrichNote, aiFindOffers, aiReady } from '../services/ai'
+import { aiWebEnrichNote, aiReady } from '../services/ai'
 import { useItemImage, deleteImage, saveImage, resizeImage } from '../services/images'
 import { mapsSearchUrl } from '../services/places'
-import { youtubeSearchUrl, spotifySearchUrl, googleSearchUrl, zapSearchUrl } from '../services/links'
+import {
+  youtubeSearchUrl,
+  spotifySearchUrl,
+  googleSearchUrl,
+  zapSearchUrl,
+  googleShoppingUrl,
+} from '../services/links'
 import { daysUntilLabel, formatEventDate } from '../utils/dates'
 import { TYPE_LABEL, TYPE_BADGE_STYLE, CREATOR_LABEL, DONE_VERB } from '../data/constants'
 import { PLATFORMS, PLATFORM_BY_ID } from '../data/platforms'
@@ -67,8 +72,6 @@ export default function ItemDetail({ item, onClose }) {
   const [galleryBusy, setGalleryBusy] = useState(false)
   const [enriching, setEnriching] = useState(false)
   const [enrichMsg, setEnrichMsg] = useState(null)
-  const [findingOffers, setFindingOffers] = useState(false)
-  const [offersMsg, setOffersMsg] = useState(null)
 
   const isScreen = item.type === 'movie' || item.type === 'series'
   const isNote = item.type === 'note'
@@ -176,27 +179,6 @@ export default function ItemDetail({ item, onClose }) {
     setEnriching(false)
   }
 
-  // חיפוש הצעות מחיר ברשת ושמירתן עם הפריט. המחירים הם מה שנמצא ברגע החיפוש —
-  // מוצגים עם קישור לאימות בחנות עצמה.
-  async function findOffers() {
-    setFindingOffers(true)
-    setOffersMsg(null)
-    try {
-      const offers = await aiFindOffers({ title: item.titleHe, kind: item.kind }, aiKey)
-      updateItem(item.id, { offers, offersCheckedAt: Date.now() })
-      setOffersMsg(
-        offers.length
-          ? { ok: true, text: `נמצאו ${offers.length} הצעות — המחירים נכונים לרגע החיפוש, מומלץ לאמת בקישור` }
-          : { ok: false, text: 'לא נמצאו הצעות אמינות — נסו לדייק את שם הדגם, או בדקו בזאפ' },
-      )
-    } catch (e) {
-      setOffersMsg({
-        ok: false,
-        text: [e.message || 'החיפוש נכשל — נסו שוב', e.detail].filter(Boolean).join(' — '),
-      })
-    }
-    setFindingOffers(false)
-  }
 
   const metaParts = [
     item.year,
@@ -411,102 +393,27 @@ export default function ItemDetail({ item, onClose }) {
 
         {isNote && (
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="text-[11px] font-bold text-slate-400">איפה הכי זול לקנות?</div>
+            <div className="text-[11px] font-bold text-slate-400 mb-1.5">השוואת מחירים</div>
+            <div className="flex gap-2">
               <a
                 href={zapSearchUrl(item.titleHe)}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[11px] font-bold text-blue-700 underline"
+                className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-blue-700 rounded-xl py-2.5"
               >
+                <ShoppingCart className="w-3.5 h-3.5" />
                 השוואה בזאפ
               </a>
+              <a
+                href={googleShoppingUrl(item.titleHe)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 rounded-xl py-2.5"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                מחירים בגוגל
+              </a>
             </div>
-            {aiReady(aiKey) && (
-              <button
-                onClick={findOffers}
-                disabled={findingOffers}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 disabled:opacity-50 rounded-xl py-2.5"
-              >
-                {findingOffers ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                )}
-                {findingOffers
-                  ? 'מחפש הצעות מחיר ברשת…'
-                  : item.offers?.length
-                    ? 'רענון הצעות המחיר'
-                    : 'חיפוש המחיר הטוב ביותר ברשת'}
-              </button>
-            )}
-            {offersMsg && (
-              <div
-                className={`text-[11px] font-semibold mt-1.5 ${offersMsg.ok ? 'text-emerald-600' : 'text-rose-500'}`}
-              >
-                {offersMsg.text}
-              </div>
-            )}
-            {item.offers?.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                {item.offers.map((offer, i) => (
-                  <div
-                    key={`${offer.store}-${i}`}
-                    className={`rounded-xl px-3 py-2 border ${
-                      i === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-black text-slate-800">₪{offer.price}</span>
-                      <span className="text-xs font-bold text-slate-600 truncate">{offer.store}</span>
-                      {offer.trust === 'high' && (
-                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-700">
-                          <BadgeCheck className="w-3 h-3" /> אמין
-                        </span>
-                      )}
-                      {i === 0 && (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-1.5 py-0.5 ms-auto shrink-0">
-                          הכי זול
-                        </span>
-                      )}
-                    </div>
-                    {offer.shippingNote && (
-                      <div className="text-[11px] text-slate-500 mt-0.5">משלוח: {offer.shippingNote}</div>
-                    )}
-                    <div className="flex gap-2 mt-1.5">
-                      {offer.link && (
-                        <a
-                          href={offer.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-bold text-white bg-blue-700 rounded-lg py-1.5"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          לחנות
-                        </a>
-                      )}
-                      <button
-                        onClick={() =>
-                          updateItem(item.id, {
-                            price: offer.price,
-                            store: offer.store,
-                            ...(offer.link ? { link: offer.link } : {}),
-                          })
-                        }
-                        className="flex-1 text-[11px] font-bold text-teal-700 bg-teal-50 rounded-lg py-1.5"
-                      >
-                        שמירה כמחיר וחנות של המוצר
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {item.offersCheckedAt && (
-                  <div className="text-[10px] text-slate-400">
-                    נבדק: {new Date(item.offersCheckedAt).toLocaleString('he-IL')} — מחירים משתנים, אמתו בקישור
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 

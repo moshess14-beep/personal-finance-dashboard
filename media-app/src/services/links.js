@@ -8,3 +8,7 @@ export const googleSearchUrl = (q) => `https://www.google.com/search?q=${encodeU
 
 // השוואת מחירים בזאפ — תמיד מעודכן, בלי תלות ב-AI
 export const zapSearchUrl = (q) => `https://www.zap.co.il/search.aspx?keyword=${encodeURIComponent(q)}`
+
+// חיפוש מוצרים בגוגל (טאב Shopping) — מחירים חיים מהחנויות עצמן
+export const googleShoppingUrl = (q) =>
+  `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(q)}`
