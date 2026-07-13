@@ -350,6 +350,39 @@ export async function aiCompleteDetails(candidate, apiKey) {
   }
 }
 
+// סיווג קישור שהודבק/שותף: ה-AI מחפש בגוגל את הכתובת כדי להבין מה יש בה —
+// ספר, סרט, שיר, מוצר, מתכון, מקום — ומחזיר קטגוריה + פרטים ראשוניים.
+export async function aiClassifyLink(url, apiKey, genericCategories = []) {
+  if (DEMO) return { category: 'unknown', title: '' }
+  if (!apiKey && !aiProxy)
+    throw new AiError('הזיהוי החכם לא זמין — התחברו לחשבון או הזינו מפתח', 'no key & no proxy')
+
+  const genericIds = genericCategories.map((c) => c.id)
+  const genericEnum = genericIds.length ? genericIds.join('|') + '|' : ''
+  const genericList = genericCategories.map((c) => `${c.id}=${c.label}`).join(', ')
+
+  const prompt = `משתמש ישראלי שמר את הקישור הזה כהמלצה: ${url}
+חפש בגוגל את הכתובת (או את המילים שמופיעות בה) כדי להבין מה יש בקישור, וסווג אותו.
+החזר JSON בלבד במבנה הזה:
+{"category":"book|movie|series|music|${genericEnum}unknown",
+"title":"שם הפריט (הספר/הסרט/השיר/המוצר/המתכון/המקום) בעברית אם ידוע, אחרת בשפת המקור",
+"altTitle":"השם באנגלית אם רלוונטי, אחרת ריק",
+"creator":"מחבר/אמן/יוצר אם רלוונטי, אחרת ריק",
+"kind":"אם זו האזנה: שיר|אלבום|אמן|פודקאסט. אם זה מוצר: סוג המוצר. אחרת ריק",
+"price":מחיר בש"ח כמספר אם מופיע|null,
+"store":"אם זה מוצר — שם החנות/האתר, אחרת ריק",
+"address":"אם זה מקום — כתובת/יישוב, אחרת ריק",
+"summary":"משפט אחד שמתאר את מה שבקישור",
+"confidence":"high|medium|low"}
+כללי סיווג: ספר=book, סרט=movie, סדרה=series, שיר/אלבום/פודקאסט/אמן=music.
+בנוסף, למשתמש יש קטגוריות כלליות (מזהה=שם): ${genericList || 'אין'}. אם התוכן מתאים לאחת מהן (למשל מוצר לקנייה, מתכון, מקום) — החזר את המזהה המדויק שלה.
+אם אינך מצליח להבין מה בקישור — category=unknown ו-title ריק. אל תמציא.`
+
+  const data = await geminiJson(apiKey, [{ text: prompt }], 4096, true)
+  if (!data || typeof data !== 'object') throw new AiError('תשובה לא תקינה מהשירות', 'bad shape')
+  return data
+}
+
 // זיהוי מוצר/פריט מדויק בעזרת חיפוש גוגל (Search Grounding): המודל מקבל את התמונה
 // ואת מה שכבר ידוע, מחפש ברשת בעצמו, ומחזיר מותג/דגם/מחיר/חנות/קישור.
 // משמש בכפתור "השלמה חכמה מהרשת" בטופס ההוספה הכללי (מוצרים וכו').

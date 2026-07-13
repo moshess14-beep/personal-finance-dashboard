@@ -7,7 +7,7 @@ import useLibraryStore from '../store/useLibraryStore'
 import { searchAll, enrichCandidate } from '../services/search'
 import { searchMusic, fetchLinkInfo, isListenLink, extractUrl, guessKindFromLink } from '../services/music'
 import { extractTextFromImage, pickCandidateLines } from '../services/ocr'
-import { analyzeImage, aiCompleteDetails } from '../services/ai'
+import { analyzeImage, aiCompleteDetails, aiClassifyLink } from '../services/ai'
 import { saveImage, resizeImage } from '../services/images'
 import { TYPE_LABEL, TYPE_BADGE_STYLE, CREATOR_LABEL } from '../data/constants'
 import { PLATFORM_BY_ID } from '../data/platforms'
@@ -24,6 +24,8 @@ const STEP_TITLE = {
   categoryChoice: 'לאיזו קטגוריה?',
   musicQuery: 'חיפוש שיר, אמן או פודקאסט',
   musicConfirm: 'פרטי ההאזנה',
+  linkInput: 'הוספה מקישור',
+  linkAnalyze: 'מזהה את הקישור',
 }
 
 const MUSIC_KINDS = ['שיר', 'אלבום', 'אמן', 'פודקאסט']
@@ -86,6 +88,7 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
 
   const [step, setStep] = useState(() => {
     if (mode === 'share') return 'analyze' // מוחלף מיד ב-useEffect לפי תוכן השיתוף
+    if (mode === 'link') return 'linkInput'
     if (forcedMusic) return 'musicQuery' // האזנה — חיפוש ייעודי (גם לתמונה: השם מוקלד והתמונה נשמרת)
     if (mode === 'image') return canAi ? 'analyze' : 'ocr'
     if (forcedGeneric) return 'simple'
@@ -112,6 +115,8 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
   const [musicResults, setMusicResults] = useState(null)
   const [musicSearching, setMusicSearching] = useState(false)
   const musicSeqRef = useRef(0)
+  const [linkInput, setLinkInput] = useState('')
+  const [pastedLink, setPastedLink] = useState('') // נשמר עם הפריט כשמנתבים לקטגוריה כללית
 
   // קישור/טקסט ששותפו לאפליקציה מבחוץ: קישור האזנה (יוטיוב/ספוטיפיי/אפל מיוזיק)
   // נקלט ישר לקטגוריית ההאזנה עם שליפת השם אוטומטית; כל טקסט אחר נכנס כחיפוש שם.
@@ -141,11 +146,106 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
       })
       return
     }
-    // טקסט חופשי — מנקים קישור אם יש, ופותחים חיפוש שם עם הטקסט מוכן
-    setQuery((sharedText || '').replace(/https?:\/\/\S+/g, '').trim() || (url || '').trim())
+    // קישור שאינו האזנה (מוצר/ספר/מתכון/כתבה) — מנתבים לזיהוי הקישור המלא
+    if (url) {
+      analyzeLink(url)
+      return
+    }
+    // טקסט חופשי — פותחים חיפוש שם עם הטקסט מוכן
+    setQuery((sharedText || '').trim())
     setStep('query')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // זיהוי קישור שהודבק/שותף: האזנה נקלטת בלי AI; כל השאר מסווג עם AI (חיפוש גוגל)
+  // ומנותב לקטגוריה המתאימה עם הפרטים והקישור. בלי AI — בחירת קטגוריה ידנית.
+  async function analyzeLink(rawUrl) {
+    const url = (rawUrl || '').trim()
+    if (!url) return
+    if (isListenLink(url)) {
+      setMusicForm({
+        title: '',
+        creator: '',
+        kind: guessKindFromLink(url),
+        coverUrl: null,
+        link: url,
+        loadingLink: true,
+      })
+      setStep('musicConfirm')
+      fetchLinkInfo(url).then((info) => {
+        setMusicForm((f) =>
+          f && {
+            ...f,
+            loadingLink: false,
+            title: f.title || info?.title || '',
+            creator: f.creator || info?.creator || '',
+            coverUrl: f.coverUrl || info?.coverUrl || null,
+          },
+        )
+      })
+      return
+    }
+    setPastedLink(url)
+    if (!canAi) {
+      setQuery(slugTitle(url))
+      setStep('categoryChoice')
+      return
+    }
+    setStep('linkAnalyze')
+    try {
+      const genericCats = categories.filter((c) => !c.builtin).map((c) => ({ id: c.id, label: c.label }))
+      const info = await aiClassifyLink(url, aiKey, genericCats)
+      setAiInfo(info)
+      const title = (info.title || '').trim()
+      const cat = info.category
+      if (cat === 'music' && title) {
+        setMusicForm({
+          title,
+          creator: info.creator || '',
+          kind: MUSIC_KINDS.includes(info.kind) ? info.kind : 'שיר',
+          coverUrl: null,
+          link: url,
+        })
+        setStep('musicConfirm')
+        return
+      }
+      if (['book', 'movie', 'series'].includes(cat) && title) {
+        setQuery(title)
+        setAutoIdentified(true)
+        doSearch(title, info.altTitle)
+        return
+      }
+      const target = categories.find(
+        (c) => !c.builtin && (c.id === cat || c.id === GENERIC_SEED_MAP[cat]),
+      )
+      if (target && title) {
+        setSimple({
+          type: 'note',
+          categoryId: target.id,
+          categoryLabel: target.label,
+          init: {
+            title,
+            kind: info.kind || '',
+            price: info.price || '',
+            store: info.store || '',
+            address: info.address || '',
+            link: url,
+            sourceText: '',
+            fromAi: true,
+          },
+        })
+        setStep('simple')
+        return
+      }
+      // לא זוהה — בחירה ידנית, עם מה שכן נמצא
+      setQuery(title)
+      setStep('categoryChoice')
+    } catch (e) {
+      setError(`זיהוי הקישור נכשל: ${e.message || 'שגיאה'} — בחרו קטגוריה ידנית`)
+      setQuery(slugTitle(url))
+      setStep('categoryChoice')
+    }
+  }
 
   // חיפוש האזנה תוך כדי הקלדה (iTunes — חינמי, בלי מפתח)
   useEffect(() => {
@@ -476,6 +576,7 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
         address: aiInfo?.address || '',
         price: aiInfo?.price || guessPrice(ocrText) || '',
         store: aiInfo?.store || '',
+        link: pastedLink || '',
         sourceText: aiInfo?.rawText || ocrText || '',
         fromAi: !!aiInfo,
       },
@@ -687,6 +788,64 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
             את שאר הפרטים אוטומטית.
           </p>
           {categoryEscape}
+        </div>
+      )}
+
+      {step === 'linkInput' && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && analyzeLink(linkInput)}
+              autoFocus
+              dir="ltr"
+              placeholder="https://…"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-teal-600"
+            />
+            <button
+              onClick={() => analyzeLink(linkInput)}
+              disabled={!/^https?:\/\/\S+/i.test(linkInput.trim())}
+              className="bg-teal-700 disabled:bg-slate-300 text-white rounded-xl px-4 flex items-center gap-1.5 text-sm font-bold"
+            >
+              <Sparkles className="w-4 h-4" />
+              זיהוי
+            </button>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText()
+                const url = extractUrl(text)
+                if (url) {
+                  setLinkInput(url)
+                  analyzeLink(url)
+                } else setError('לא נמצא קישור בלוח ההעתקה — הדביקו ידנית בשדה למעלה')
+              } catch {
+                setError('הדפדפן לא מאפשר קריאה מהלוח — הדביקו ידנית בשדה למעלה')
+              }
+            }}
+            className="w-full text-xs font-bold text-teal-700 bg-teal-50 rounded-xl py-2.5"
+          >
+            📋 הדבקה מלוח ההעתקה
+          </button>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            כל קישור מתקבל: מוצר מחנות, ספר, שיר או סרטון מיוטיוב/ספוטיפיי, מתכון, מקום…
+            האפליקציה תזהה מה זה, תסווג לקטגוריה המתאימה ותמלא את הפרטים.
+          </p>
+          {categoryEscape}
+        </div>
+      )}
+
+      {step === 'linkAnalyze' && (
+        <div className="space-y-3">
+          <div className="text-xs text-slate-400 break-all bg-slate-50 rounded-xl px-3 py-2" dir="ltr">
+            {pastedLink}
+          </div>
+          <div className="flex items-center gap-2 text-sm text-teal-700 font-semibold">
+            <Sparkles className="w-4 h-4 animate-pulse" />
+            מזהה את הקישור: מה זה ולאיזו קטגוריה…
+          </div>
         </div>
       )}
 
@@ -1040,6 +1199,17 @@ export default function AddFlow({ mode, file, category = null, sharedText = '', 
       )}
     </Modal>
   )
+}
+
+// ניחוש שם מתוך כתובת ה-URL עצמה (החלק האחרון בנתיב) — למקרה שאין AI זמין
+function slugTitle(url) {
+  try {
+    const seg = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || '')
+    const t = seg.replace(/\.\w{2,5}$/, '').replace(/[-_+]/g, ' ').trim()
+    return t.length > 2 && !/^\d+$/.test(t) ? t : ''
+  } catch {
+    return ''
+  }
 }
 
 function guessPrice(text) {
