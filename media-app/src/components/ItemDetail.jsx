@@ -164,7 +164,10 @@ export default function ItemDetail({ item, onClose }) {
         setEnrichMsg({ ok: false, text: 'לא נמצאו פרטים חדשים להוסיף' })
       }
     } catch (e) {
-      setEnrichMsg({ ok: false, text: e.message || 'המשיכה מהרשת נכשלה — נסו שוב' })
+      setEnrichMsg({
+        ok: false,
+        text: [e.message || 'המשיכה מהרשת נכשלה — נסו שוב', e.detail].filter(Boolean).join(' — '),
+      })
     }
     setEnriching(false)
   }
