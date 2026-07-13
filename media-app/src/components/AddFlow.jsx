@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, Loader2, ChevronLeft, PencilLine, Sparkles } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
@@ -538,6 +538,8 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
                 onSearch={() => doSearch()}
                 busy={busy}
                 placeholder="או הקלידו/תקנו את השם כאן"
+                tmdbKey={tmdbKey}
+                onPick={chooseCandidate}
               />
               {categoryEscape}
             </>
@@ -554,9 +556,12 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
             busy={busy}
             autoFocus
             placeholder="שם של ספר / סרט / סדרה…"
+            tmdbKey={tmdbKey}
+            onPick={chooseCandidate}
           />
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            מספיק שם בלבד — נזהה אם זה ספר, סרט או סדרה ונשלים את שאר הפרטים אוטומטית.
+            התוצאות מופיעות תוך כדי הקלדה — מספיק שם בלבד, נזהה אם זה ספר, סרט או סדרה ונשלים
+            את שאר הפרטים אוטומטית.
           </p>
           {categoryEscape}
         </div>
@@ -759,6 +764,9 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
           categoryLabel={simple.categoryLabel}
           init={simple.init}
           imageUrl={imageUrl}
+          imageFile={file}
+          canAi={canAi}
+          aiKey={aiKey}
           titleSuggestions={ocrLines || []}
           onSave={saveSimple}
           busy={busy}
@@ -774,25 +782,88 @@ function guessPrice(text) {
   return m ? m[1] || m[2] : ''
 }
 
-function SearchBox({ query, setQuery, onSearch, busy, autoFocus, placeholder }) {
+function SearchBox({ query, setQuery, onSearch, busy, autoFocus, placeholder, tmdbKey, onPick }) {
+  // הצעות תוך כדי הקלדה: אחרי הפסקה קצרה בהקלדה מחפשים ברקע ומציגים התאמות מיד,
+  // בלי צורך ללחוץ "חיפוש". מונה רץ מוודא שתשובה איטית ישנה לא תדרוס חדשה.
+  const [suggestions, setSuggestions] = useState(null)
+  const [suggesting, setSuggesting] = useState(false)
+  const seqRef = useRef(0)
+
+  useEffect(() => {
+    if (!onPick) return
+    const text = query.trim()
+    if (text.length < 2) {
+      setSuggestions(null)
+      setSuggesting(false)
+      return
+    }
+    const seq = ++seqRef.current
+    setSuggesting(true)
+    const timer = setTimeout(async () => {
+      try {
+        const r = await searchAll(text, tmdbKey)
+        if (seqRef.current !== seq) return
+        setSuggestions([...r.screen, ...r.books].slice(0, 5))
+      } catch {
+        if (seqRef.current === seq) setSuggestions(null)
+      }
+      if (seqRef.current === seq) setSuggesting(false)
+    }, 450)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
   return (
-    <div className="flex gap-2">
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-        autoFocus={autoFocus}
-        placeholder={placeholder}
-        className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-teal-600"
-      />
-      <button
-        onClick={onSearch}
-        disabled={busy || !query.trim()}
-        className="bg-teal-700 disabled:bg-slate-300 text-white rounded-xl px-4 flex items-center gap-1.5 text-sm font-bold"
-      >
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-        חיפוש
-      </button>
+    <div>
+      <div className="flex gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+          autoFocus={autoFocus}
+          placeholder={placeholder}
+          className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-teal-600"
+        />
+        <button
+          onClick={onSearch}
+          disabled={busy || !query.trim()}
+          className="bg-teal-700 disabled:bg-slate-300 text-white rounded-xl px-4 flex items-center gap-1.5 text-sm font-bold"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          חיפוש
+        </button>
+      </div>
+      {onPick && suggesting && !suggestions?.length && (
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold mt-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" /> מחפש תוך כדי הקלדה…
+        </div>
+      )}
+      {onPick && suggestions?.length > 0 && (
+        <div className="mt-1.5 space-y-1">
+          {suggestions.map((c, i) => (
+            <button
+              key={`${c.source}-${c.externalId ?? i}`}
+              onClick={() => {
+                setSuggestions(null)
+                onPick(c)
+              }}
+              disabled={busy}
+              className="w-full flex items-center gap-2 text-right bg-slate-50 hover:bg-teal-50 rounded-xl px-2 py-1.5 transition disabled:opacity-50"
+            >
+              <Cover item={c} className="w-7 aspect-[2/3] rounded shrink-0" emojiSize="text-xs" />
+              <span className="flex-1 min-w-0 text-xs font-bold text-slate-700 truncate">
+                {c.titleHe}
+              </span>
+              <span
+                className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold shrink-0 ${TYPE_BADGE_STYLE[c.type] || 'bg-slate-200 text-slate-600'}`}
+              >
+                {TYPE_LABEL[c.type] || '?'}
+              </span>
+              {c.year && <span className="text-[10px] text-slate-400 shrink-0">{c.year}</span>}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
