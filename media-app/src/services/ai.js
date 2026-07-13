@@ -6,8 +6,16 @@ import { demoAnalyze } from '../data/demoData'
 
 // גוגל מחליפה/מוציאה משימוש שמות מודל קונקרטיים עם הזמן (למשל gemini-1.5-flash).
 // gemini-flash-latest הוא alias יציב שגוגל מתחזקת ומצביע תמיד על המודל המהיר הנוכחי —
-// לכן הוא ראשון. שאר השמות הם רשת ביטחון למקרה שהאלias עדיין לא נתמך במפתח מסוים.
-const MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
+// לכן הוא ראשון. דגמי ה-lite אחריו הם רשת הביטחון המרכזית: מכסה חינמית גדולה פי כמה
+// ועומס נמוך בהרבה, כך שכשהמודל הראשי עמוס (503) או שמכסתו נגמרה (429) — עוברים
+// אליהם אוטומטית באותה בקשה, והזיהוי ממשיך לעבוד.
+const MODEL_CANDIDATES = [
+  'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+]
 
 // שגיאה עם פירוט טכני, כדי שאפשר יהיה להציג למשתמש מה בדיוק השתבש
 export class AiError extends Error {
@@ -175,10 +183,13 @@ async function discoverModel(apiKey) {
 async function geminiJson(apiKey, parts, maxOutputTokens = 4096, useSearch = false) {
   const queue = [...new Set([discoveredModel, ...MODEL_CANDIDATES].filter(Boolean))]
   let lastErr
+  // אם דילגנו על מודל בגלל עומס/מכסה זמניים (ולא כי הוא לא קיים) — לא קובעים את
+  // מודל-הגיבוי שהצליח כמועדף הקבוע, כדי לחזור למודל האיכותי כשהעומס יחלוף.
+  let transientSkip = false
   for (const model of queue) {
     try {
       const result = await callModel(model, apiKey, parts, maxOutputTokens, useSearch)
-      discoveredModel = model
+      if (!transientSkip) discoveredModel = model
       return result
     } catch (e) {
       lastErr = e
@@ -188,12 +199,13 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096, useSearch = fal
         await sleep(1500)
         try {
           const result = await callModel(model, apiKey, parts, maxOutputTokens, useSearch)
-          discoveredModel = model
+          if (!transientSkip) discoveredModel = model
           return result
         } catch (e2) {
           lastErr = e2
         }
       }
+      if ([429, 500, 503].includes(lastErr?.status)) transientSkip = true
       // 404 = המודל הזה לא קיים; 429 = מכסה ספציפית לדגם; 500/503 = עומס —
       // בכל המקרים האלה שווה לנסות את המודל הבא ברשימה לפני שמוותרים.
       if (![404, 429, 500, 503].includes(lastErr?.status)) break
