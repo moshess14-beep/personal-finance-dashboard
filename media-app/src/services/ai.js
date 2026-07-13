@@ -180,7 +180,21 @@ async function discoverModel(apiKey) {
 
 // מכסת ברירת מחדל נדיבה: מודלי 2.5 סופרים גם טוקני "חשיבה" בתוך המכסה, ולכן ערך
 // נמוך מדי קוטע את התשובה עוד לפני שנכתב ה-JSON.
+// לחיפוש גוגל (grounding) יש מכסה חינמית נפרדת וקטנה מזו של המודל עצמו — לכן אם בקשה
+// עם חיפוש נדחתה בגלל מכסה (429) או שהשדה לא נתמך (400), מנסים שוב בלי חיפוש: הידע
+// הפנימי של המודל עדיין נותן תשובה טובה, וזה עדיף מכישלון מוחלט.
 async function geminiJson(apiKey, parts, maxOutputTokens = 4096, useSearch = false) {
+  try {
+    return await geminiJsonAttempt(apiKey, parts, maxOutputTokens, useSearch)
+  } catch (e) {
+    if (useSearch && (e.status === 429 || e.status === 400)) {
+      return await geminiJsonAttempt(apiKey, parts, maxOutputTokens, false)
+    }
+    throw e
+  }
+}
+
+async function geminiJsonAttempt(apiKey, parts, maxOutputTokens, useSearch) {
   const queue = [...new Set([discoveredModel, ...MODEL_CANDIDATES].filter(Boolean))]
   let lastErr
   // אם דילגנו על מודל בגלל עומס/מכסה זמניים (ולא כי הוא לא קיים) — לא קובעים את
@@ -242,13 +256,15 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096, useSearch = fal
     userMessage = 'שרתי הזיהוי של גוגל עמוסים כרגע — זה זמני ולא קשור למכסה, נסו שוב בעוד רגע'
   else if (status) userMessage = `שגיאת שרת (${status})`
   else userMessage = 'לא הצלחתי להתחבר לשירות הזיהוי (בעיית רשת)'
-  throw new AiError(userMessage, [
+  const aiErr = new AiError(userMessage, [
     lastErr?.message,
     lastErr?.status ? `status ${lastErr.status}` : null,
     lastErr?.bodyText,
   ]
     .filter(Boolean)
     .join(' · '))
+  aiErr.status = status
+  throw aiErr
 }
 
 // ניתוח צילום מסך: זיהוי קטגוריה + חילוץ פרטים, בקריאה אחת.

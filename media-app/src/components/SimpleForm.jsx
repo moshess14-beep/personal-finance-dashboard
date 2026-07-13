@@ -114,7 +114,10 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
           (data.confidence === 'low' ? 'רמת הוודאות נמוכה — כדאי לבדוק לפני שמירה.' : 'בדקו ותקנו אם צריך.'),
       })
     } catch (e) {
-      setEnrichMsg({ ok: false, text: e.message || 'ההשלמה מהרשת נכשלה — נסו שוב' })
+      setEnrichMsg({
+        ok: false,
+        text: [e.message || 'ההשלמה מהרשת נכשלה — נסו שוב', e.detail].filter(Boolean).join(' — '),
+      })
     }
     setEnriching(false)
   }
