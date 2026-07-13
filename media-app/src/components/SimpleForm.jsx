@@ -59,6 +59,8 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
     price: init?.price || '',
     store: init?.store || '',
     link: init?.link || '',
+    specs: init?.specs || [],
+    summary: init?.summary || '',
     genres: init?.genres || [],
     creator: init?.creator || '',
     showType: init?.showType || null,
@@ -89,6 +91,9 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
       const found = []
       if (data.brand) found.push(`מותג: ${data.brand}`)
       if (data.model) found.push(`דגם: ${data.model}`)
+      const specs = (Array.isArray(data.specs) ? data.specs : [])
+        .filter((r) => r && r.label && r.value)
+        .slice(0, 10)
       setF((s) => {
         const next = { ...s }
         if (!s.title.trim() && data.title) next.title = data.title
@@ -96,6 +101,8 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
         if (!s.price && data.price != null) next.price = data.price
         if (!s.store.trim() && data.store) next.store = data.store
         if (!s.link.trim() && data.link) next.link = data.link
+        if (specs.length) next.specs = specs
+        if (!s.summary && data.summary) next.summary = data.summary
         return next
       })
       if (data.title && f.title.trim() && data.title.trim() !== f.title.trim())
@@ -160,6 +167,8 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
         price: parseFloat(String(f.price).replace(',', '.')) || null,
         store: f.store.trim(),
         link: f.link.trim(),
+        specs: f.specs,
+        summary: f.summary,
       })
       return
     }
@@ -256,6 +265,31 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
               }`}
             >
               {enrichMsg.text}
+            </div>
+          )}
+          {f.specs.length > 0 && (
+            <div className="mt-1.5 bg-slate-50 rounded-xl px-3 py-2">
+              <div className="text-[11px] font-bold text-slate-400 mb-1">
+                מפרט טכני שנמצא (יישמר עם המוצר):
+              </div>
+              <div className="space-y-0.5">
+                {f.specs.map((row, i) => (
+                  <div key={`${row.label}-${i}`} className="flex items-center gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setF((s) => ({ ...s, specs: s.specs.filter((_, j) => j !== i) }))
+                      }
+                      className="text-rose-400 font-bold shrink-0"
+                      aria-label={`הסרת ${row.label}`}
+                    >
+                      ×
+                    </button>
+                    <span className="font-bold text-slate-500 shrink-0">{row.label}:</span>
+                    <span className="text-slate-600 min-w-0">{row.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

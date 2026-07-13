@@ -11,6 +11,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Undo2,
+  Sparkles,
 } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
@@ -18,6 +19,7 @@ import TagEditor from './TagEditor'
 import ImageGallery from './ImageGallery'
 import useLibraryStore from '../store/useLibraryStore'
 import { fetchAvailability } from '../services/search'
+import { aiWebEnrichNote, aiReady } from '../services/ai'
 import { useItemImage, deleteImage, saveImage, resizeImage } from '../services/images'
 import { mapsSearchUrl } from '../services/places'
 import { youtubeSearchUrl, spotifySearchUrl, googleSearchUrl } from '../services/links'
@@ -54,12 +56,15 @@ export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
   const removeItem = useLibraryStore((s) => s.removeItem)
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
+  const aiKey = useLibraryStore((s) => s.aiKey)
   const categories = useLibraryStore((s) => s.categories)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState(item.myNote || '')
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState(null)
   const [galleryBusy, setGalleryBusy] = useState(false)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichMsg, setEnrichMsg] = useState(null)
 
   const isScreen = item.type === 'movie' || item.type === 'series'
   const isNote = item.type === 'note'
@@ -123,6 +128,45 @@ export default function ItemDetail({ item, onClose }) {
   function removeGalleryImage(id) {
     deleteImage(id)
     updateItem(item.id, { extraImageIds: (item.extraImageIds || []).filter((x) => x !== id) })
+  }
+
+  // משיכת מפרט טכני ופרטים מהרשת לפריט שכבר שמור: שולחים את התמונה השמורה + מה שידוע
+  // ל-AI עם חיפוש גוגל, וממלאים מפרט/קישור/מחיר. שדות שכבר מולאו ידנית לא נדרסים.
+  async function enrichFromWeb() {
+    setEnriching(true)
+    setEnrichMsg(null)
+    try {
+      let blob = null
+      if (storedImage) blob = await fetch(storedImage).then((r) => r.blob())
+      const data = await aiWebEnrichNote(
+        { title: item.titleHe, kind: item.kind, store: item.store, sourceText: item.sourceText || '' },
+        blob,
+        aiKey,
+      )
+      const specs = (Array.isArray(data.specs) ? data.specs : [])
+        .filter((r) => r && r.label && r.value)
+        .slice(0, 10)
+      const patch = {}
+      if (specs.length) patch.specs = specs
+      if (!item.kind && data.kind) patch.kind = data.kind
+      if (item.price == null && data.price != null) patch.price = data.price
+      if (!item.store && data.store) patch.store = data.store
+      if (!item.link && data.link) patch.link = data.link
+      if (!item.summary && data.summary) patch.summary = data.summary
+      if (Object.keys(patch).length > 0) {
+        updateItem(item.id, patch)
+        const found = []
+        if (data.brand) found.push(`מותג: ${data.brand}`)
+        if (data.model) found.push(`דגם: ${data.model}`)
+        if (specs.length) found.push(`${specs.length} נתוני מפרט`)
+        setEnrichMsg({ ok: true, text: `עודכן מהרשת${found.length ? ' — ' + found.join(' · ') : ''}` })
+      } else {
+        setEnrichMsg({ ok: false, text: 'לא נמצאו פרטים חדשים להוסיף' })
+      }
+    } catch (e) {
+      setEnrichMsg({ ok: false, text: e.message || 'המשיכה מהרשת נכשלה — נסו שוב' })
+    }
+    setEnriching(false)
   }
 
   const metaParts = [
@@ -289,6 +333,51 @@ export default function ItemDetail({ item, onClose }) {
           <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl px-3 py-2">
             {item.summary}
           </p>
+        )}
+
+        {isNote && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[11px] font-bold text-slate-400">מפרט טכני</div>
+              {aiReady(aiKey) && (
+                <button
+                  onClick={enrichFromWeb}
+                  disabled={enriching}
+                  className="flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 rounded-full px-2.5 py-1 disabled:opacity-50"
+                >
+                  {enriching ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3" />
+                  )}
+                  {item.specs?.length ? 'רענון מהרשת' : 'משיכת מפרט ופרטים מהרשת'}
+                </button>
+              )}
+            </div>
+            {enrichMsg && (
+              <div
+                className={`text-[11px] font-semibold mb-1.5 ${enrichMsg.ok ? 'text-emerald-600' : 'text-rose-500'}`}
+              >
+                {enrichMsg.text}
+              </div>
+            )}
+            {item.specs?.length > 0 ? (
+              <div className="bg-slate-50 rounded-xl px-3 py-2 space-y-1">
+                {item.specs.map((row, i) => (
+                  <div key={`${row.label}-${i}`} className="flex gap-1.5 text-xs">
+                    <span className="font-bold text-slate-500 shrink-0">{row.label}:</span>
+                    <span className="text-slate-600 min-w-0">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              !enrichMsg && (
+                <div className="text-[11px] text-slate-400">
+                  אין עדיין מפרט — {aiReady(aiKey) ? 'אפשר למשוך מהרשת בלחיצה למעלה' : 'התחברו לחשבון כדי למשוך מהרשת'}
+                </div>
+              )
+            )}
+          </div>
         )}
 
         {item.sourceText && (
