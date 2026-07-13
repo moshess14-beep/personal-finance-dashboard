@@ -7,6 +7,7 @@ const EMOJI = {
   series: '📺',
   artist: '🎤',
   show: '🎫',
+  music: '🎧',
   note: '🏷️',
 }
 const GRADIENT = {
@@ -15,6 +16,7 @@ const GRADIENT = {
   series: 'from-blue-600 to-cyan-800',
   artist: 'from-emerald-500 to-teal-800',
   show: 'from-teal-600 to-slate-900',
+  music: 'from-indigo-600 to-slate-900',
   note: 'from-slate-600 to-slate-800',
 }
 

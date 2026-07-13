@@ -62,6 +62,7 @@ export default function App() {
   const seeded = useLibraryStore((s) => s.seeded)
   const seedDemo = useLibraryStore((s) => s.seedDemo)
   const migrateLegacyItems = useLibraryStore((s) => s.migrateLegacyItems)
+  const ensureBuiltinCategories = useLibraryStore((s) => s.ensureBuiltinCategories)
 
   const [view, setView] = useState(null) // null (מסך פתיחה) | מזהה קטגוריה
   const [filters, setFilters] = useState({})
@@ -75,19 +76,28 @@ export default function App() {
 
   useEffect(() => {
     migrateLegacyItems()
+    ensureBuiltinCategories()
     if (DEMO && !seeded && items.length === 0) seedDemo()
     if (!DEMO) connectSync()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // תמונה ששותפה מאפליקציה אחרת (גוגל תמונות / וואטסאפ) → פתיחת זרימת ההוספה
+  // שיתוף מאפליקציה אחרת → פתיחת זרימת ההוספה: תמונה (גוגל תמונות / וואטסאפ),
+  // או קישור/טקסט (יוטיוב, ספוטיפיי וכו' — נכנסים להאזנה או לחיפוש שם)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('shared') !== '1') return
-    consumeSharedImage().then((file) => {
-      if (file) setAddFlow({ mode: 'image', file, category: null })
+    if (params.get('shared') === '1') {
+      consumeSharedImage().then((file) => {
+        if (file) setAddFlow({ mode: 'image', file, category: null })
+        window.history.replaceState(null, '', window.location.pathname)
+      })
+      return
+    }
+    const sharedText = params.get('shared-text')
+    if (sharedText) {
       window.history.replaceState(null, '', window.location.pathname)
-    })
+      setAddFlow({ mode: 'share', sharedText, category: null })
+    }
   }, [])
 
   const category = view ? categories.find((c) => c.id === view) : null

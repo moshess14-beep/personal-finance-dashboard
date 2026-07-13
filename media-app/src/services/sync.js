@@ -47,6 +47,9 @@ async function handleSession(supabase, session) {
     enableAiProxy(supabase)
     installHooks(supabase, user.id)
     setupRealtime(supabase, user.id)
+    // ההגדרות שירדו מהענן עשויות להיות מגרסה ישנה של האפליקציה — משלימים קטגוריות
+    // builtin חדשות (כמו "האזנה") אחרי שההוקים מותקנים, כדי שהתיקון גם ייכתב לענן.
+    useLibraryStore.getState().ensureBuiltinCategories()
     useLibraryStore.setState({ syncStatus: 'synced' })
   } catch (e) {
     useLibraryStore.setState({ syncStatus: 'error', syncError: e.message || 'שגיאת סנכרון' })
