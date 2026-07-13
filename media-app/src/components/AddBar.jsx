@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { Camera, Keyboard, ClipboardPaste, ImagePlus } from 'lucide-react'
+import { Camera, Keyboard, ClipboardPaste, ImagePlus, Link2 } from 'lucide-react'
 import { readClipboardImage } from '../services/shareTarget'
 
-export default function AddBar({ onImage, onName }) {
+export default function AddBar({ onImage, onName, onLink }) {
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
   const [msg, setMsg] = useState(null)
@@ -51,20 +51,27 @@ export default function AddBar({ onImage, onName }) {
           e.target.value = ''
         }}
       />
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => cameraRef.current?.click()}
-          className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-2xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.99] transition"
+          className="bg-white border border-slate-200 text-slate-600 rounded-2xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.99] transition"
         >
           <Camera className="w-4 h-4" />
           צילום עכשיו
         </button>
         <button
           onClick={paste}
-          className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-2xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.99] transition"
+          className="bg-white border border-slate-200 text-slate-600 rounded-2xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.99] transition"
         >
           <ClipboardPaste className="w-4 h-4" />
           הדבקת תמונה
+        </button>
+        <button
+          onClick={onLink}
+          className="bg-white border border-slate-200 text-slate-600 rounded-2xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.99] transition"
+        >
+          <Link2 className="w-4 h-4" />
+          הדבקת קישור
         </button>
         <button
           onClick={onName}

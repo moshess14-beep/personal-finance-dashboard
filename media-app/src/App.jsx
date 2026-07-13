@@ -152,6 +152,7 @@ export default function App() {
             <AddBar
               onImage={(file) => startAdd({ mode: 'image', file, category: null })}
               onName={() => startAdd({ mode: 'name', category: null })}
+              onLink={() => startAdd({ mode: 'link', category: null })}
             />
             <div className="flex justify-end mt-3">
               <button
@@ -204,6 +205,7 @@ export default function App() {
           <AddBar
             onImage={(file) => startAdd({ mode: 'image', file })}
             onName={() => startAdd({ mode: 'name' })}
+            onLink={() => startAdd({ mode: 'link' })}
           />
         </Modal>
       )}
