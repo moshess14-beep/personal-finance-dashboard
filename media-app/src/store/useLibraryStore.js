@@ -89,6 +89,24 @@ const useLibraryStore = create(
         set((s) => ({ items: s.items.map(migrateItem), migratedV2: true }))
       },
 
+      // משלים קטגוריות builtin חדשות שנוספו לאפליקציה אחרי שרשימת הקטגוריות של
+      // המשתמש כבר נשמרה (מקומית או בענן) — למשל קטגוריית "האזנה". כל קטגוריה
+      // חסרה נשתלת במקומה המקורי בסדר ברירת המחדל.
+      ensureBuiltinCategories: () => {
+        const existing = get().categories
+        const missing = DEFAULT_CATEGORIES.filter(
+          (d) => d.builtin && !existing.some((c) => c.id === d.id),
+        )
+        if (missing.length === 0) return
+        const merged = [...existing]
+        for (const cat of missing) {
+          const idx = DEFAULT_CATEGORIES.findIndex((d) => d.id === cat.id)
+          merged.splice(Math.min(idx, merged.length), 0, cat)
+        }
+        set({ categories: merged })
+        syncHooks?.onSettingsChange?.(get().settingsSnapshot())
+      },
+
       addItem: (item) => {
         const full = {
           extraImageIds: [],

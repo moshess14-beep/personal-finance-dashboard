@@ -6,6 +6,7 @@ export const TYPE_LABEL = {
   series: 'סדרה',
   artist: 'אמן',
   show: 'הופעה',
+  music: 'האזנה',
   note: 'פריט',
 }
 
@@ -16,10 +17,17 @@ export const TYPE_BADGE_STYLE = {
   series: 'bg-cyan-100 text-cyan-800',
   artist: 'bg-blue-200 text-blue-900',
   show: 'bg-teal-200 text-teal-900',
+  music: 'bg-indigo-100 text-indigo-800',
   note: 'bg-slate-200 text-slate-700',
 }
 
-export const CREATOR_LABEL = { book: 'מחבר/ת', movie: 'במאי/ת', series: 'יוצר/ת', show: 'מבצע/ת' }
+export const CREATOR_LABEL = {
+  book: 'מחבר/ת',
+  movie: 'במאי/ת',
+  series: 'יוצר/ת',
+  show: 'מבצע/ת',
+  music: 'אמן/ית',
+}
 
 // מיון בתוך קטגוריה
 export const SORT_OPTIONS = [
@@ -36,6 +44,7 @@ export const DONE_VERB = {
   series: 'ראיתי',
   artist: 'הכרתי',
   show: 'הייתי',
+  music: 'האזנתי',
   note: 'בוצע',
 }
 
@@ -61,6 +70,15 @@ export const DEFAULT_CATEGORIES = [
     builtin: true,
     types: ['movie', 'series'],
     gradient: 'from-blue-800 to-slate-950',
+  },
+  {
+    id: 'listening',
+    label: 'האזנה',
+    sub: 'מוזיקה ופודקאסטים',
+    emoji: '🎧',
+    builtin: true,
+    types: ['music'],
+    gradient: 'from-indigo-700 to-slate-950',
   },
   {
     id: 'live',

@@ -27,7 +27,7 @@ export default function Header({ onSettings }) {
             )}
           </h1>
           <p className="text-xs text-white/80 mt-1">
-            קריאה · צפייה · בילויים · מתכונים · מוצרים · הופעות חיות
+            קריאה · צפייה · האזנה · מוצרים · מתכונים · בילויים
           </p>
           {badge && (
             <span

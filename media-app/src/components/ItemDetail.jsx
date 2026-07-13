@@ -189,6 +189,7 @@ export default function ItemDetail({ item, onClose }) {
       ? `כ־${item.episodeRuntimeMinutes} דק' לפרק`
       : null,
     item.type === 'show' && item.showType ? item.showType : null,
+    item.type === 'music' && item.kind ? item.kind : null,
     item.type === 'show' && item.price ? `₪${item.price} לכרטיס` : null,
     isNote && item.price ? `₪${item.price}` : null,
     isNote && item.store ? item.store : null,
@@ -295,10 +296,21 @@ export default function ItemDetail({ item, onClose }) {
           </div>
         )}
 
-        {item.type === 'artist' && (
+        {(item.type === 'artist' || item.type === 'music') && (
           <div className="flex gap-2">
+            {item.type === 'music' && item.link && (
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-slate-800 rounded-2xl py-2.5"
+              >
+                <ExternalLink className="w-4 h-4" />
+                למקור
+              </a>
+            )}
             <a
-              href={spotifySearchUrl(item.titleHe)}
+              href={spotifySearchUrl(`${item.titleHe} ${item.creator || ''}`.trim())}
               target="_blank"
               rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-emerald-600 rounded-2xl py-2.5"
@@ -307,7 +319,7 @@ export default function ItemDetail({ item, onClose }) {
               ספוטיפיי
             </a>
             <a
-              href={youtubeSearchUrl(item.titleHe)}
+              href={youtubeSearchUrl(`${item.titleHe} ${item.creator || ''}`.trim())}
               target="_blank"
               rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-blue-700 rounded-2xl py-2.5"
@@ -520,6 +532,21 @@ export default function ItemDetail({ item, onClose }) {
 
         {item.type === 'artist' && (
           <ToggleChips label="סגנון" options={MUSIC_GENRES} selected={item.genres} onToggle={toggleMulti('genres')} />
+        )}
+
+        {item.type === 'music' && (
+          <div className="grid grid-cols-2 gap-2">
+            <EditableField
+              label="אמן / יוצר"
+              value={item.creator || ''}
+              onSave={(v) => updateItem(item.id, { creator: v.trim() })}
+            />
+            <EditableField
+              label="סוג (שיר/אלבום/פודקאסט)"
+              value={item.kind || ''}
+              onSave={(v) => updateItem(item.id, { kind: v.trim() })}
+            />
+          </div>
         )}
 
         {item.type === 'show' && (

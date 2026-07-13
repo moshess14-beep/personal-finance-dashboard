@@ -5,6 +5,7 @@ import Cover from './Cover'
 import SimpleForm from './SimpleForm'
 import useLibraryStore from '../store/useLibraryStore'
 import { searchAll, enrichCandidate } from '../services/search'
+import { searchMusic, fetchLinkInfo, isListenLink, extractUrl, guessKindFromLink } from '../services/music'
 import { extractTextFromImage, pickCandidateLines } from '../services/ocr'
 import { analyzeImage, aiCompleteDetails } from '../services/ai'
 import { saveImage, resizeImage } from '../services/images'
@@ -21,7 +22,11 @@ const STEP_TITLE = {
   simple: 'פרטי ההמלצה',
   liveChoice: 'אמן או הופעה?',
   categoryChoice: 'לאיזו קטגוריה?',
+  musicQuery: 'חיפוש שיר, אמן או פודקאסט',
+  musicConfirm: 'פרטי ההאזנה',
 }
+
+const MUSIC_KINDS = ['שיר', 'אלבום', 'אמן', 'פודקאסט']
 
 // מיפוי סיווג גס שה-AI מחזיר לקטגוריות ברירת המחדל, לפי מזהה (עמיד לשינוי שם התווית)
 const GENERIC_SEED_MAP = { place: 'places', recipe: 'recipes', product: 'products', misc: 'misc' }
@@ -64,7 +69,7 @@ function titleScore(line, title) {
   return 0
 }
 
-export default function AddFlow({ mode, file, category = null, onClose, onSaved }) {
+export default function AddFlow({ mode, file, category = null, sharedText = '', onClose, onSaved }) {
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const aiKey = useLibraryStore((s) => s.aiKey)
   const authUser = useLibraryStore((s) => s.authUser)
@@ -77,8 +82,11 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
   const forcedCategory = category ? categories.find((c) => c.id === category) : null
   const forcedGeneric = forcedCategory && !forcedCategory.builtin ? forcedCategory : null
   const forcedLive = forcedCategory?.id === 'live'
+  const forcedMusic = !!forcedCategory?.builtin && (forcedCategory.types || []).includes('music')
 
   const [step, setStep] = useState(() => {
+    if (mode === 'share') return 'analyze' // מוחלף מיד ב-useEffect לפי תוכן השיתוף
+    if (forcedMusic) return 'musicQuery' // האזנה — חיפוש ייעודי (גם לתמונה: השם מוקלד והתמונה נשמרת)
     if (mode === 'image') return canAi ? 'analyze' : 'ocr'
     if (forcedGeneric) return 'simple'
     if (forcedLive) return 'liveChoice'
@@ -100,11 +108,76 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
   const [simple, setSimple] = useState(
     forcedGeneric ? { type: 'note', categoryId: forcedGeneric.id, categoryLabel: forcedGeneric.label, init: {} } : null,
   )
+  const [musicForm, setMusicForm] = useState(null) // {title, creator, kind, coverUrl, link, loadingLink}
+  const [musicResults, setMusicResults] = useState(null)
+  const [musicSearching, setMusicSearching] = useState(false)
+  const musicSeqRef = useRef(0)
+
+  // קישור/טקסט ששותפו לאפליקציה מבחוץ: קישור האזנה (יוטיוב/ספוטיפיי/אפל מיוזיק)
+  // נקלט ישר לקטגוריית ההאזנה עם שליפת השם אוטומטית; כל טקסט אחר נכנס כחיפוש שם.
+  useEffect(() => {
+    if (mode !== 'share') return
+    const url = extractUrl(sharedText)
+    if (url && isListenLink(url)) {
+      setMusicForm({
+        title: '',
+        creator: '',
+        kind: guessKindFromLink(url),
+        coverUrl: null,
+        link: url,
+        loadingLink: true,
+      })
+      setStep('musicConfirm')
+      fetchLinkInfo(url).then((info) => {
+        setMusicForm((f) =>
+          f && {
+            ...f,
+            loadingLink: false,
+            title: f.title || info?.title || '',
+            creator: f.creator || info?.creator || '',
+            coverUrl: f.coverUrl || info?.coverUrl || null,
+          },
+        )
+      })
+      return
+    }
+    // טקסט חופשי — מנקים קישור אם יש, ופותחים חיפוש שם עם הטקסט מוכן
+    setQuery((sharedText || '').replace(/https?:\/\/\S+/g, '').trim() || (url || '').trim())
+    setStep('query')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // חיפוש האזנה תוך כדי הקלדה (iTunes — חינמי, בלי מפתח)
+  useEffect(() => {
+    if (step !== 'musicQuery') return
+    const text = query.trim()
+    if (text.length < 2) {
+      setMusicResults(null)
+      setMusicSearching(false)
+      return
+    }
+    const seq = ++musicSeqRef.current
+    setMusicSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchMusic(text)
+        if (musicSeqRef.current !== seq) return
+        setMusicResults(results)
+      } catch {
+        if (musicSeqRef.current === seq) setMusicResults([])
+      }
+      if (musicSeqRef.current === seq) setMusicSearching(false)
+    }, 450)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, step])
 
   useEffect(() => {
     if (mode !== 'image' || !file) return
     const url = URL.createObjectURL(file)
     setImageUrl(url)
+    // בקטגוריית האזנה אין צנרת זיהוי — המשתמש מחפש/מקליד את השם והתמונה נשמרת עם הפריט
+    if (forcedMusic) return () => URL.revokeObjectURL(url)
     let cancelled = false
 
     async function pipeline() {
@@ -139,6 +212,18 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
       // אם נפתח מתוך קטגוריה גנרית קבועה — תמיד לשם
       if (forcedGeneric) {
         openGenericWithInfo(forcedGeneric, info, title)
+        return true
+      }
+      // ה-AI זיהה תוכן להאזנה (שיר/אלבום/פודקאסט, למשל צילום מסך מספוטיפיי)
+      if (cat === 'music' && title) {
+        setMusicForm({
+          title,
+          creator: info.creator || '',
+          kind: 'שיר',
+          coverUrl: null,
+          link: '',
+        })
+        setStep('musicConfirm')
         return true
       }
       // ה-AI זיהה בבירור אמן או הופעה — פותחים ישר, בלי לשאול
@@ -332,12 +417,50 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
     setStep('simple')
   }
 
+  // שמירת פריט האזנה (שיר/אלבום/אמן/פודקאסט)
+  async function saveMusic() {
+    if (!musicForm?.title.trim()) {
+      setError('חסר שם — זה השדה היחיד שחובה למלא')
+      return
+    }
+    setBusy(true)
+    let imageId = null
+    try {
+      if (file) {
+        imageId = crypto.randomUUID()
+        const resized = await resizeImage(file)
+        await saveImage(imageId, resized)
+      }
+    } catch {
+      // כישלון שמירת התמונה לא חוסם שמירת הפריט עצמו
+    }
+    addItem({
+      type: 'music',
+      titleHe: musicForm.title.trim(),
+      creator: (musicForm.creator || '').trim(),
+      kind: musicForm.kind || '',
+      coverUrl: musicForm.coverUrl || null,
+      link: musicForm.link || '',
+      genres: [],
+      identification: musicForm.fromSearch || musicForm.link ? 'confirmed' : 'manual',
+      imageId,
+      myNote: '',
+    })
+    setBusy(false)
+    onSaved()
+  }
+
   // בחירת קטגוריה חופשית מתוך categoryChoice (או שינוי דעה מכל שלב אחר)
   function routeToCategory(cat) {
     if (cat.builtin && (cat.types.includes('book') || cat.types.includes('movie'))) {
       const guess = (aiInfo?.title || query || '').trim()
       if (guess) doSearch(guess, aiInfo?.altTitle)
       else setStep('query')
+      return
+    }
+    if (cat.builtin && cat.types.includes('music')) {
+      setQuery((query || aiInfo?.title || '').trim())
+      setStep('musicQuery')
       return
     }
     if (cat.id === 'live') {
@@ -564,6 +687,149 @@ export default function AddFlow({ mode, file, category = null, onClose, onSaved 
             את שאר הפרטים אוטומטית.
           </p>
           {categoryEscape}
+        </div>
+      )}
+
+      {step === 'musicQuery' && (
+        <div className="space-y-2">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              className="w-full max-h-40 object-contain rounded-xl bg-slate-100"
+              alt="התמונה שהועלתה"
+            />
+          )}
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+            placeholder="שם של שיר / אמן / אלבום / פודקאסט…"
+            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-teal-600"
+          />
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            התוצאות מופיעות תוך כדי הקלדה. אפשר גם לשתף לאפליקציה קישור מיוטיוב או ספוטיפיי —
+            והוא ייכנס לכאן אוטומטית.
+          </p>
+          {musicSearching && !musicResults?.length && (
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+              <Loader2 className="w-3 h-3 animate-spin" /> מחפש…
+            </div>
+          )}
+          {musicResults?.length > 0 && (
+            <div className="space-y-1">
+              {musicResults.map((r, i) => (
+                <button
+                  key={`${r.title}-${r.creator}-${i}`}
+                  onClick={() => {
+                    setMusicForm({ ...r, fromSearch: true })
+                    setStep('musicConfirm')
+                  }}
+                  className="w-full flex items-center gap-2 text-right bg-slate-50 hover:bg-teal-50 rounded-xl px-2 py-1.5 transition"
+                >
+                  {r.coverUrl ? (
+                    <img src={r.coverUrl} className="w-9 h-9 rounded-lg object-cover shrink-0" alt="" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                      🎧
+                    </span>
+                  )}
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs font-bold text-slate-700 truncate">{r.title}</span>
+                    {r.creator && (
+                      <span className="block text-[11px] text-slate-400 truncate">{r.creator}</span>
+                    )}
+                  </span>
+                  <span className="text-[10px] rounded-full px-1.5 py-0.5 font-bold shrink-0 bg-indigo-100 text-indigo-800">
+                    {r.kind}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {musicResults?.length === 0 && !musicSearching && (
+            <div className="text-[11px] text-slate-400 font-semibold">
+              לא נמצאו תוצאות — אפשר להזין ידנית למטה
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setMusicForm({ title: query.trim(), creator: '', kind: 'שיר', coverUrl: null, link: '' })
+              setStep('musicConfirm')
+            }}
+            className="w-full text-xs font-bold text-teal-700 bg-teal-50 rounded-xl py-2.5 flex items-center justify-center gap-1"
+          >
+            <PencilLine className="w-3.5 h-3.5" />
+            הזנה ידנית
+          </button>
+          {categoryEscape}
+        </div>
+      )}
+
+      {step === 'musicConfirm' && musicForm && (
+        <div className="space-y-3">
+          <div className="flex gap-3 items-start">
+            {(musicForm.coverUrl || imageUrl) && (
+              <img
+                src={musicForm.coverUrl || imageUrl}
+                className="w-20 h-20 rounded-xl object-cover bg-slate-100 shrink-0"
+                alt=""
+              />
+            )}
+            <div className="flex-1 space-y-2">
+              {musicForm.loadingLink && (
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+                  <Loader2 className="w-3 h-3 animate-spin" /> שולף את הפרטים מהקישור…
+                </div>
+              )}
+              <Field
+                label="שם *"
+                value={musicForm.title}
+                onChange={(e) => setMusicForm((f) => ({ ...f, title: e.target.value }))}
+              />
+              <Field
+                label="אמן / יוצר"
+                value={musicForm.creator}
+                onChange={(e) => setMusicForm((f) => ({ ...f, creator: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-bold text-slate-400 mb-1">מה זה?</div>
+            <div className="flex flex-wrap gap-1.5">
+              {MUSIC_KINDS.map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setMusicForm((f) => ({ ...f, kind: f.kind === k ? '' : k }))}
+                  className={`text-xs rounded-full px-3 py-1.5 border font-semibold ${
+                    musicForm.kind === k
+                      ? 'bg-teal-700 border-teal-700 text-white'
+                      : 'bg-white border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </div>
+          {musicForm.link && (
+            <div className="text-[11px] text-slate-400 leading-relaxed break-all">
+              🔗 הקישור ששותף יישמר עם הפריט: {musicForm.link}
+            </div>
+          )}
+          <button
+            onClick={saveMusic}
+            disabled={busy}
+            className="w-full bg-teal-700 disabled:bg-slate-300 text-white font-bold rounded-2xl py-3 active:scale-[0.99] transition flex items-center justify-center gap-2"
+          >
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            שמירה בהאזנה
+          </button>
+          <button
+            onClick={() => setStep('musicQuery')}
+            className="w-full text-xs font-bold text-slate-500 bg-slate-100 rounded-xl py-2.5"
+          >
+            חזרה לחיפוש
+          </button>
         </div>
       )}
 
