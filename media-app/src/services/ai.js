@@ -64,20 +64,27 @@ async function geminiFetch(ownKey, path, init) {
   })
 }
 
-async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinkingConfig) {
+async function callModelRaw(model, apiKey, parts, maxOutputTokens, includeThinkingConfig, useSearch) {
   const generationConfig = {
     temperature: 0.1,
     maxOutputTokens,
-    responseMimeType: 'application/json',
   }
+  // מצב חיפוש (Search Grounding) אינו נתמך יחד עם מצב JSON מובנה — לכן במצב חיפוש
+  // מבקשים JSON בפרומפט בלבד ומחלצים אותו מהטקסט עם parseJsonLoose.
+  if (!useSearch) generationConfig.responseMimeType = 'application/json'
   // דגמי 2.5 מפעילים ברירת מחדל "חשיבה" שצורכת חלק ניכר ממכסת הטוקנים לפני התשובה
   // עצמה — במשימת חילוץ נתונים דטרמיניסטית זו לא נחוצה, ורק מסכנת תשובה ריקה.
   if (includeThinkingConfig) generationConfig.thinkingConfig = { thinkingBudget: 0 }
 
+  const body = { contents: [{ parts }], generationConfig }
+  // עיגון בחיפוש גוגל: המודל מחפש ברשת בעצמו ועונה על סמך תוצאות עדכניות —
+  // משמש לזיהוי מוצרים (מותג/דגם/מחיר) ולהשלמת פרטים מדויקת יותר.
+  if (useSearch) body.tools = [{ google_search: {} }]
+
   const res = await geminiFetch(apiKey, `models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }], generationConfig }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     let bodyText = ''
@@ -127,19 +134,21 @@ function parseJsonLoose(text) {
   }
 }
 
-async function callModel(model, apiKey, parts, maxOutputTokens) {
+async function callModel(model, apiKey, parts, maxOutputTokens, useSearch) {
   try {
-    return await callModelRaw(model, apiKey, parts, maxOutputTokens, true)
+    return await callModelRaw(model, apiKey, parts, maxOutputTokens, true, useSearch)
   } catch (e) {
     // ניסיון חוזר על אותו מודל אם: השדה thinkingConfig נדחה (400), התשובה יצאה ריקה,
     // או שהתשובה נקטעה (MAX_TOKENS). מודלים מסוימים לא מכבדים thinkingBudget=0 ומבזבזים
     // טוקנים על "חשיבה", ולכן נותנים מכסה נדיבה בהרבה ומבטלים את הגבלת החשיבה.
     if (e.status === 400 || e.retryable) {
-      return await callModelRaw(model, apiKey, parts, Math.max(maxOutputTokens * 4, 4096), false)
+      return await callModelRaw(model, apiKey, parts, Math.max(maxOutputTokens * 4, 4096), false, useSearch)
     }
     throw e
   }
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // מודל שהתגלה בהצלחה בקריאה קודמת — משתמשים בו ראשון בפעם הבאה כדי לחסוך ניסיונות
 let discoveredModel = null
@@ -163,19 +172,31 @@ async function discoverModel(apiKey) {
 
 // מכסת ברירת מחדל נדיבה: מודלי 2.5 סופרים גם טוקני "חשיבה" בתוך המכסה, ולכן ערך
 // נמוך מדי קוטע את התשובה עוד לפני שנכתב ה-JSON.
-async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
+async function geminiJson(apiKey, parts, maxOutputTokens = 4096, useSearch = false) {
   const queue = [...new Set([discoveredModel, ...MODEL_CANDIDATES].filter(Boolean))]
   let lastErr
   for (const model of queue) {
     try {
-      const result = await callModel(model, apiKey, parts, maxOutputTokens)
+      const result = await callModel(model, apiKey, parts, maxOutputTokens, useSearch)
       discoveredModel = model
       return result
     } catch (e) {
       lastErr = e
-      // 404 = המודל הזה לא קיים; 429 = יכול להיות מכסה ספציפית לדגם הזה —
-      // בשני המקרים שווה לנסות את המודל הבא ברשימה לפני שמוותרים.
-      if (e.status !== 404 && e.status !== 429) break
+      // 503/500 = עומס זמני על שרתי גוגל (נפוץ במסלול החינמי) — ממתינים רגע ומנסים
+      // שוב פעם אחת על אותו מודל לפני שעוברים הלאה.
+      if (e.status === 503 || e.status === 500) {
+        await sleep(1500)
+        try {
+          const result = await callModel(model, apiKey, parts, maxOutputTokens, useSearch)
+          discoveredModel = model
+          return result
+        } catch (e2) {
+          lastErr = e2
+        }
+      }
+      // 404 = המודל הזה לא קיים; 429 = מכסה ספציפית לדגם; 500/503 = עומס —
+      // בכל המקרים האלה שווה לנסות את המודל הבא ברשימה לפני שמוותרים.
+      if (![404, 429, 500, 503].includes(lastErr?.status)) break
     }
   }
   // כל השמות הידועים נכשלו ב"לא נמצא" — לפני שמוותרים, שואלים את גוגל מה כן זמין
@@ -183,7 +204,7 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
     const found = await discoverModel(apiKey)
     if (found && !queue.includes(found)) {
       try {
-        const result = await callModel(found, apiKey, parts, maxOutputTokens)
+        const result = await callModel(found, apiKey, parts, maxOutputTokens, useSearch)
         discoveredModel = found
         return result
       } catch (e) {
@@ -205,6 +226,8 @@ async function geminiJson(apiKey, parts, maxOutputTokens = 4096) {
   else if (status === 404 && usingProxy)
     userMessage = 'הזיהוי המובנה עדיין לא הותקן בשרת (פונקציית ה-Edge חסרה)'
   else if (status === 429) userMessage = 'חריגה ממכסת הבקשות החינמית לעת עתה — נסו שוב בעוד כמה דקות'
+  else if (status === 503 || status === 500)
+    userMessage = 'שרתי הזיהוי של גוגל עמוסים כרגע — זה זמני ולא קשור למכסה, נסו שוב בעוד רגע'
   else if (status) userMessage = `שגיאת שרת (${status})`
   else userMessage = 'לא הצלחתי להתחבר לשירות הזיהוי (בעיית רשת)'
   throw new AiError(userMessage, [
@@ -275,13 +298,14 @@ export async function aiCompleteDetails(candidate, apiKey) {
 
   const typeHe = { book: 'ספר', movie: 'סרט', series: 'סדרה' }[candidate.type]
   const prompt = `${typeHe} בשם "${candidate.titleHe}"${candidate.titleOriginal ? ` (באנגלית: ${candidate.titleOriginal})` : ''}${candidate.year ? ` משנת ${candidate.year}` : ''}.
-השלם אך ורק את השדות הבאים, במדויק: ${missing.join(', ')}.
+חפש בגוגל כדי לוודא את הפרטים, והשלם אך ורק את השדות הבאים, במדויק: ${missing.join(', ')}.
 החזר JSON בלבד:
 {"year":מספר|null,"creator":"שם בעברית"|null,"pages":מספר|null,"runtimeMinutes":מספר|null,"seasons":מספר|null,"episodeRuntimeMinutes":מספר|null,"genres":["עד 3 ז'אנרים בעברית"]|null,"summary":"תקציר בעברית עד 200 תווים"|null}
 כלל ברזל: אם אינך בטוח בערך — החזר null. עדיף שדה ריק מנתון שגוי.`
 
   try {
-    const data = await geminiJson(apiKey, [{ text: prompt }])
+    // עם עיגון בחיפוש גוגל — הפרטים מגיעים מהרשת ולא רק מהזיכרון של המודל
+    const data = await geminiJson(apiKey, [{ text: prompt }], 4096, true)
     const out = { ...candidate }
     let changed = false
     for (const key of missing) {
@@ -296,6 +320,50 @@ export async function aiCompleteDetails(candidate, apiKey) {
   } catch {
     return candidate
   }
+}
+
+// זיהוי מוצר/פריט מדויק בעזרת חיפוש גוגל (Search Grounding): המודל מקבל את התמונה
+// ואת מה שכבר ידוע, מחפש ברשת בעצמו, ומחזיר מותג/דגם/מחיר/חנות/קישור.
+// משמש בכפתור "השלמה חכמה מהרשת" בטופס ההוספה הכללי (מוצרים וכו').
+export async function aiWebEnrichNote(current, file, apiKey) {
+  if (DEMO) return null
+  if (!apiKey && !aiProxy)
+    throw new AiError('הזיהוי החכם לא זמין — התחברו לחשבון או הזינו מפתח', 'no key & no proxy')
+
+  const known = [
+    current.title ? `שם/תיאור שכבר ידוע: "${current.title}"` : null,
+    current.kind ? `סוג: ${current.kind}` : null,
+    current.store ? `חנות/מקור: ${current.store}` : null,
+    current.sourceText ? `טקסט שזוהה בתמונה: ${current.sourceText.slice(0, 250)}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const parts = [
+    {
+      text: `לפניך פריט/מוצר שמשתמש ישראלי רוצה לשמור כהמלצה.${file ? ' מצורפת תמונה שלו.' : ''}
+${known ? known + '\n' : ''}זהה את המוצר המדויק ככל האפשר: הסתכל על הלוגו, הצורה והכיתוב${file ? ' בתמונה' : ''}, וחפש בגוגל כדי למצוא את היצרן והדגם המדויקים ופרטים עדכניים.
+החזר JSON בלבד במבנה הזה:
+{"title":"שם מלא ומדויק בעברית: סוג + מותג + דגם (למשל: מכונת קפה דלונגי Magnifica S ECAM22.110)",
+"brand":"שם המותג/היצרן"|null,
+"model":"שם/מספר הדגם המדויק"|null,
+"kind":"סוג הפריט במילה-שתיים (למשל: מכונת קפה)"|null,
+"price":מחיר משוער בש"ח בישראל, כמספר|null,
+"store":"חנות או אתר שמוכרים אותו בישראל"|null,
+"link":"קישור לעמוד המוצר (אתר היצרן או חנות)"|null,
+"summary":"משפט אחד על המוצר ותכונותיו"|null,
+"confidence":"high|medium|low"}
+כלל ברזל: אם אינך בטוח בדגם המדויק — מלא את מה שכן בטוח (מותג/סוג) והחזר null בשאר. אל תמציא דגם או מחיר.`,
+    },
+  ]
+  if (file) {
+    const blob = await resizeImage(file, 1024, 0.8)
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: await blobToBase64(blob) } })
+  }
+
+  const data = await geminiJson(apiKey, parts, 4096, true)
+  if (!data || typeof data !== 'object') throw new AiError('תשובה לא תקינה מהשירות', 'bad shape')
+  return data
 }
 
 // בדיקת תקינות מהירה של המפתח, ללא תמונה — למסך ההגדרות

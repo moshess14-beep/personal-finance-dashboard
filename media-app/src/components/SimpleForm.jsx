@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Loader2, MapPin, Search } from 'lucide-react'
+import { Loader2, MapPin, Search, Sparkles } from 'lucide-react'
 import { searchPlaceAddress, mapsSearchUrl } from '../services/places'
+import { aiWebEnrichNote } from '../services/ai'
 import { MUSIC_GENRES, SHOW_TYPES } from '../data/taxonomies'
 import { CREATOR_LABEL } from '../data/constants'
 import TagEditor from './TagEditor'
@@ -49,7 +50,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, dir }) {
 // טופס הוספה: 'note' הוא הטופס הגנרי לכל קטגוריה רגילה (בילויים/מתכונים/מוצרים/שונות/...),
 // 'artist' ו-'show' נשארים טפסים ייעודיים תחת קטגוריית הופעות חיות.
 // עם התמונה שהועלתה והצעות שם מתוך הזיהוי.
-export default function SimpleForm({ type, categoryId, categoryLabel, init, imageUrl, titleSuggestions, onSave, busy }) {
+export default function SimpleForm({ type, categoryId, categoryLabel, init, imageUrl, imageFile, canAi, aiKey, titleSuggestions, onSave, busy }) {
   const [f, setF] = useState({
     title: init?.title || '',
     kind: init?.kind || '',
@@ -69,6 +70,47 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
   const [error, setError] = useState(null)
   const [addressResults, setAddressResults] = useState(null)
   const [searchingAddress, setSearchingAddress] = useState(false)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichMsg, setEnrichMsg] = useState(null) // {ok, text}
+  const [titleProposal, setTitleProposal] = useState(null)
+
+  // "השלמה חכמה מהרשת": שולחים את התמונה + מה שכבר הוקלד ל-AI עם חיפוש גוגל,
+  // והוא מזהה מותג/דגם/מחיר/חנות. ממלאים רק שדות ריקים; שם משופר מוצע ולא נכפה.
+  async function smartFill() {
+    setEnriching(true)
+    setEnrichMsg(null)
+    setError(null)
+    try {
+      const data = await aiWebEnrichNote(
+        { title: f.title, kind: f.kind, store: f.store, sourceText: init?.sourceText || '' },
+        imageFile || null,
+        aiKey,
+      )
+      const found = []
+      if (data.brand) found.push(`מותג: ${data.brand}`)
+      if (data.model) found.push(`דגם: ${data.model}`)
+      setF((s) => {
+        const next = { ...s }
+        if (!s.title.trim() && data.title) next.title = data.title
+        if (!s.kind.trim() && data.kind) next.kind = data.kind
+        if (!s.price && data.price != null) next.price = data.price
+        if (!s.store.trim() && data.store) next.store = data.store
+        if (!s.link.trim() && data.link) next.link = data.link
+        return next
+      })
+      if (data.title && f.title.trim() && data.title.trim() !== f.title.trim())
+        setTitleProposal(data.title.trim())
+      setEnrichMsg({
+        ok: true,
+        text:
+          (found.length ? `זוהה — ${found.join(' · ')}. ` : 'הפרטים הושלמו. ') +
+          (data.confidence === 'low' ? 'רמת הוודאות נמוכה — כדאי לבדוק לפני שמירה.' : 'בדקו ותקנו אם צריך.'),
+      })
+    } catch (e) {
+      setEnrichMsg({ ok: false, text: e.message || 'ההשלמה מהרשת נכשלה — נסו שוב' })
+    }
+    setEnriching(false)
+  }
 
   const set = (key) => (e) => setF((s) => ({ ...s, [key]: e.target.value }))
   const toggleMulti = (key) => (opt) =>
@@ -179,6 +221,45 @@ export default function SimpleForm({ type, categoryId, categoryLabel, init, imag
         onChange={set('title')}
         placeholder={namePlaceholder}
       />
+
+      {type === 'note' && canAi && (
+        <div>
+          <button
+            type="button"
+            onClick={smartFill}
+            disabled={enriching || (!f.title.trim() && !imageFile)}
+            className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 disabled:opacity-50 rounded-xl py-2.5"
+          >
+            {enriching ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            {enriching ? 'מחפש ברשת את המותג, הדגם והפרטים…' : 'השלמה חכמה מהרשת (מותג, דגם, מחיר…)'}
+          </button>
+          {titleProposal && (
+            <button
+              type="button"
+              onClick={() => {
+                setF((s) => ({ ...s, title: titleProposal }))
+                setTitleProposal(null)
+              }}
+              className="mt-1.5 w-full text-right text-xs bg-amber-50 text-amber-800 rounded-xl px-3 py-2 font-semibold leading-relaxed"
+            >
+              נמצא שם מדויק יותר — הקישו כדי להחליף: <b>{titleProposal}</b>
+            </button>
+          )}
+          {enrichMsg && (
+            <div
+              className={`mt-1.5 text-xs rounded-xl px-3 py-2 font-semibold leading-relaxed ${
+                enrichMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'
+              }`}
+            >
+              {enrichMsg.text}
+            </div>
+          )}
+        </div>
+      )}
 
       {type === 'show' && (
         <div className="grid grid-cols-2 gap-2">
