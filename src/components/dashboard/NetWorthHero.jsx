@@ -1,41 +1,30 @@
 import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { TrendingUp, TrendingDown, TriangleAlert } from 'lucide-react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import {
   useFinanceStore,
   selectNetWorth,
-  selectNetWorthTrend,
+  selectNetWorthGrowthSinceLastSnapshot,
   selectLastUpdatedAt,
 } from '../../store/useFinanceStore'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatRelativeDate } from '../../utils/formatDate'
 import { useCountUp } from '../../utils/useCountUp'
 
-const dateFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' })
-const STALE_AFTER_DAYS = 30
-
-function formatSince(dateStr) {
-  return dateFormatter.format(new Date(dateStr))
-}
-
-function daysSince(isoString) {
-  return Math.floor((Date.now() - new Date(isoString).getTime()) / 86_400_000)
-}
+const sinceFormatter = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default function NetWorthHero() {
   const netWorth = useFinanceStore(selectNetWorth)
-  // selectNetWorthTrend returns a fresh object each call; useShallow keeps the
-  // snapshot referentially stable when its contents haven't actually changed,
-  // otherwise useSyncExternalStore treats it as "always changing" and loops.
-  const trend = useFinanceStore(useShallow(selectNetWorthTrend))
+  // Fresh object each call; useShallow keeps the reference stable when the
+  // contents haven't actually changed, otherwise useSyncExternalStore treats
+  // it as "always changing" and loops.
+  const trend = useFinanceStore(useShallow(selectNetWorthGrowthSinceLastSnapshot))
   const assetsCount = useFinanceStore((s) => s.assets.length)
   const liabilitiesCount = useFinanceStore((s) => s.liabilities.length)
   const lastUpdatedAt = useFinanceStore(selectLastUpdatedAt)
   const animated = useCountUp(netWorth)
 
   const isPositiveTrend = trend && trend.delta >= 0
-  const staleDays = lastUpdatedAt ? daysSince(lastUpdatedAt) : null
-  const isStale = staleDays !== null && staleDays >= STALE_AFTER_DAYS
 
   return (
     <motion.div
@@ -64,11 +53,11 @@ export default function NetWorthHero() {
             {isPositiveTrend ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
             {isPositiveTrend ? '+' : ''}
             {formatCurrency(trend.delta)} ({isPositiveTrend ? '+' : ''}
-            {trend.percent.toFixed(1)}%) מאז {formatSince(trend.sinceDate)}
+            {trend.percent.toFixed(1)}%) מאז הצילום ב־{sinceFormatter.format(new Date(trend.sinceDate))}
           </span>
         ) : (
           <span className="text-slate-400 dark:text-slate-500">
-            מתחילים לעקוב היום — המגמה תופיע כאן מהביקור הבא
+            אין עדיין צילום מצב להשוואה — סגירת תקופה תיצור נקודת התחלה
           </span>
         )}
       </div>
@@ -77,13 +66,6 @@ export default function NetWorthHero() {
         מבוסס על {assetsCount} נכסים ו־{liabilitiesCount} התחייבויות
         {lastUpdatedAt && <> · עודכן לאחרונה {formatRelativeDate(lastUpdatedAt)}</>}
       </p>
-
-      {isStale && (
-        <div className="mx-auto mt-4 flex max-w-md items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          <TriangleAlert className="size-3.5 shrink-0" />
-          עברו {staleDays} ימים מאז העדכון האחרון — כדאי לבדוק אם משהו השתנה
-        </div>
-      )}
     </motion.div>
   )
 }

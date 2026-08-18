@@ -6,9 +6,10 @@ import Dashboard from './routes/Dashboard'
 import Assets from './routes/Assets'
 import Liabilities from './routes/Liabilities'
 import Savings from './routes/Savings'
-import History from './routes/History'
+import Snapshots from './routes/Snapshots'
 import Income from './routes/Income'
 import Timeline from './routes/Timeline'
+import PeriodUpdate from './routes/PeriodUpdate'
 
 function App() {
   const isDark = useThemeStore((s) => s.isDark)
@@ -26,9 +27,10 @@ function App() {
           <Route path="/assets" element={<Assets />} />
           <Route path="/liabilities" element={<Liabilities />} />
           <Route path="/savings" element={<Savings />} />
-          <Route path="/history" element={<History />} />
+          <Route path="/history" element={<Snapshots />} />
           <Route path="/income" element={<Income />} />
           <Route path="/timeline" element={<Timeline />} />
+          <Route path="/update" element={<PeriodUpdate />} />
         </Routes>
       </main>
     </div>

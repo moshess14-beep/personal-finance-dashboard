@@ -62,7 +62,7 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((p) => ({
       date: p.date,
-      netWorth: Number(p.totalAssets || 0) - Number(p.totalLiabilities || 0),
+      netWorth: Number(p.netWorth || 0),
       isLive: Boolean(p.isLive),
     }))
 
@@ -86,15 +86,15 @@ export default function NetWorthProgressChart({ points, delay = 0 }) {
           <TrendingUp className="size-8 text-slate-300 dark:text-slate-600" />
           <p className="max-w-xs text-sm text-slate-500 dark:text-slate-400">
             {sorted.length === 0
-              ? 'עדיין אין נקודות היסטוריה.'
+              ? 'עדיין אין צילומי מצב.'
               : 'יש רק נקודה אחת עדיין, מתאריך היום.'}{' '}
-            הוסף לפחות נקודת היסטוריה אחת מהעבר כדי לראות את גרף ההתקדמות שלך.
+            צלם מצב אחד מהעבר, או סגור תקופה, כדי לראות את גרף ההתקדמות שלך.
           </p>
           <Link
             to="/history"
             className="mt-1 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
           >
-            להוספת נקודת היסטוריה
+            למסך צילומי המצב
           </Link>
         </div>
       ) : (

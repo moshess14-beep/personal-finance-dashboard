@@ -29,14 +29,49 @@ export const BACKUP_DATA_KEYS = [
   'liabilities',
   'savingsComponents',
   'incomeSources',
-  'historyPoints',
-  'netWorthHistory',
+  'snapshots',
   'activityLog',
   'categories',
 ]
 
 function activityEntry(entityType, action, summary) {
   return { id: crypto.randomUUID(), entityType, action, summary, timestamp: now() }
+}
+
+// A snapshot always exposes totals. A "full" snapshot (from a period close)
+// carries frozen copies of the item arrays and derives its totals from them,
+// so editing a snapshot's items can never drift from its headline numbers. A
+// "totals-only" snapshot (a manual historical backfill, or a migrated V1.2
+// history point) has null arrays and stores the totals directly. This helper
+// is the single place both cases resolve to numbers.
+export function getSnapshotTotals(snap) {
+  if (Array.isArray(snap.assets)) {
+    const totalAssets = snap.assets.reduce((sum, a) => sum + Number(a.value || 0), 0)
+    const totalLiabilities = (snap.liabilities || []).reduce((sum, l) => sum + Number(l.value || 0), 0)
+    return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities }
+  }
+  const totalAssets = Number(snap.totalAssets || 0)
+  const totalLiabilities = Number(snap.totalLiabilities || 0)
+  return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities }
+}
+
+// Converts the old V1.2 historyPoints (totals-only manual points) into
+// totals-only snapshots, so upgrading the app or importing an old backup
+// keeps every past point the user entered.
+function historyPointsToSnapshots(historyPoints) {
+  if (!Array.isArray(historyPoints)) return []
+  return historyPoints.map((p) => ({
+    id: p.id || crypto.randomUUID(),
+    date: p.date,
+    note: p.note || '',
+    createdAt: p.updatedAt || now(),
+    assets: null,
+    liabilities: null,
+    savingsComponents: null,
+    incomeSources: null,
+    totalAssets: Number(p.totalAssets || 0),
+    totalLiabilities: Number(p.totalLiabilities || 0),
+  }))
 }
 
 // Converts the old single-field monthlySavings shape (pre savingsComponents
@@ -63,8 +98,7 @@ export const useFinanceStore = create(
       liabilities: [],
       savingsComponents: [],
       incomeSources: [],
-      historyPoints: [],
-      netWorthHistory: [],
+      snapshots: [],
       activityLog: [],
       categories: DEFAULT_CATEGORIES,
 
@@ -245,40 +279,99 @@ export const useFinanceStore = create(
           }
         }),
 
-      addHistoryPoint: (point) =>
+      // The core V2 action. The ritual collects only the values the user
+      // actually changed (id -> new value maps); this applies them to the
+      // live state and then freezes a full, deep-copied snapshot of the
+      // resulting state, stamped with the chosen date. Upsert by date: closing
+      // twice for the same date replaces that date's snapshot rather than
+      // duplicating it.
+      closePeriod: ({ date, note = '', assetValues = {}, liabilityValues = {}, savingsValues = {}, incomeValues = {} }) =>
         set((s) => {
-          const item = { id: crypto.randomUUID(), note: '', updatedAt: now(), ...point }
-          const netWorth = Number(item.totalAssets || 0) - Number(item.totalLiabilities || 0)
+          const stamp = now()
+          const applyValues = (list, values, field) =>
+            list.map((it) =>
+              values[it.id] != null && values[it.id] !== ''
+                ? { ...it, [field]: Number(values[it.id]) || 0, updatedAt: stamp }
+                : it,
+            )
+          const assets = applyValues(s.assets, assetValues, 'value')
+          const liabilities = applyValues(s.liabilities, liabilityValues, 'value')
+          const savingsComponents = applyValues(s.savingsComponents, savingsValues, 'amount')
+          const incomeSources = applyValues(s.incomeSources, incomeValues, 'amount')
+
+          const snapshot = {
+            id: crypto.randomUUID(),
+            date,
+            note: note.trim(),
+            createdAt: stamp,
+            assets: structuredClone(assets),
+            liabilities: structuredClone(liabilities),
+            savingsComponents: structuredClone(savingsComponents),
+            incomeSources: structuredClone(incomeSources),
+          }
+          const netWorth = getSnapshotTotals(snapshot).netWorth
+          const snapshots = [...s.snapshots.filter((x) => x.date !== date), snapshot].sort((a, b) =>
+            a.date.localeCompare(b.date),
+          )
           return {
-            historyPoints: [...s.historyPoints, item],
+            assets,
+            liabilities,
+            savingsComponents,
+            incomeSources,
+            snapshots,
             activityLog: [
               ...s.activityLog,
-              activityEntry(
-                'historyPoint',
-                'created',
-                `נוספה נקודת היסטוריה ל-${item.date} (שווי נקי: ${formatCurrency(netWorth)})`,
-              ),
+              activityEntry('snapshot', 'created', `נסגרה תקופה ונשמר צילום ל-${date} (שווי נקי: ${formatCurrency(netWorth)})`),
             ],
           }
         }),
-      updateHistoryPoint: (id, patch) =>
+
+      // A manual, totals-only historical point - for backfilling dates from
+      // before the app was tracking (e.g. "end of 2022"). No per-item
+      // breakdown, just the headline totals.
+      addManualSnapshot: ({ date, totalAssets, totalLiabilities, note = '' }) =>
+        set((s) => {
+          const snapshot = {
+            id: crypto.randomUUID(),
+            date,
+            note: note.trim(),
+            createdAt: now(),
+            assets: null,
+            liabilities: null,
+            savingsComponents: null,
+            incomeSources: null,
+            totalAssets: Number(totalAssets) || 0,
+            totalLiabilities: Number(totalLiabilities) || 0,
+          }
+          const netWorth = getSnapshotTotals(snapshot).netWorth
+          const snapshots = [...s.snapshots.filter((x) => x.date !== date), snapshot].sort((a, b) =>
+            a.date.localeCompare(b.date),
+          )
+          return {
+            snapshots,
+            activityLog: [
+              ...s.activityLog,
+              activityEntry('snapshot', 'created', `נוסף צילום היסטורי ל-${date} (שווי נקי: ${formatCurrency(netWorth)})`),
+            ],
+          }
+        }),
+
+      updateSnapshot: (id, patch) =>
         set((s) => ({
-          historyPoints: s.historyPoints.map((p) =>
-            p.id === id ? { ...p, ...patch, updatedAt: now() } : p,
-          ),
-        })),
-      deleteHistoryPoint: (id) =>
-        set((s) => ({
-          historyPoints: s.historyPoints.filter((p) => p.id !== id),
+          snapshots: s.snapshots
+            .map((snap) => (snap.id === id ? { ...snap, ...patch } : snap))
+            .sort((a, b) => a.date.localeCompare(b.date)),
         })),
 
-      recordNetWorthSnapshot: (netWorth) =>
+      deleteSnapshot: (id) =>
         set((s) => {
-          const today = new Date().toISOString().slice(0, 10)
-          const history = s.netWorthHistory.filter((h) => h.date !== today)
-          history.push({ date: today, netWorth })
-          history.sort((a, b) => a.date.localeCompare(b.date))
-          return { netWorthHistory: history }
+          const item = s.snapshots.find((x) => x.id === id)
+          return {
+            snapshots: s.snapshots.filter((x) => x.id !== id),
+            activityLog: item
+              ? [...s.activityLog, activityEntry('snapshot', 'deleted', `נמחק צילום מצב מ-${item.date}`)]
+              : s.activityLog,
+          }
         }),
 
       replaceAll: (data) =>
@@ -288,21 +381,30 @@ export const useFinanceStore = create(
           savingsComponents:
             data.savingsComponents ?? monthlySavingsToComponents(data.monthlySavings),
           incomeSources: data.incomeSources ?? [],
-          historyPoints: data.historyPoints ?? [],
-          netWorthHistory: data.netWorthHistory ?? [],
+          // Old backups (pre-V2) carry historyPoints instead of snapshots.
+          snapshots: data.snapshots ?? historyPointsToSnapshots(data.historyPoints),
           activityLog: data.activityLog ?? [],
           categories: data.categories ?? DEFAULT_CATEGORIES,
         }),
     }),
     {
       name: 'pfd-finance-data',
-      version: 1,
+      version: 2,
       migrate: (persistedState, version) => {
+        let state = persistedState ?? {}
         if (version === 0) {
-          const { monthlySavings, ...rest } = persistedState ?? {}
-          return { ...rest, savingsComponents: monthlySavingsToComponents(monthlySavings) }
+          const { monthlySavings, ...rest } = state
+          state = { ...rest, savingsComponents: monthlySavingsToComponents(monthlySavings) }
         }
-        return persistedState
+        if (version < 2) {
+          // V1.2's historyPoints + the auto netWorthHistory both collapse into
+          // the single snapshots series. historyPoints become totals-only
+          // snapshots; netWorthHistory (a throwaway auto log) is dropped.
+          const { historyPoints, netWorthHistory: _dropped, ...rest } = state
+          void _dropped
+          state = { ...rest, snapshots: historyPointsToSnapshots(historyPoints) }
+        }
+        return state
       },
     },
   ),
@@ -360,42 +462,58 @@ export const selectTotalLiabilities = (s) =>
 export const selectNetWorth = (s) =>
   selectTotalAssets(s) - selectTotalLiabilities(s)
 
-// Growth since the last manually-entered history point - the literal total
-// change and percent, not normalized into a "monthly rate". An earlier
-// version divided the total change by elapsed months, which produced a
-// number with no intuitive meaning once the anchor was more than a few
-// weeks old (e.g. "18,687 ₪/month" derived from a point 2.5 years back reads
-// as a real monthly figure but is actually a multi-year average - see PR
-// discussion). A true monthly growth metric needs an actual monthly
-// cadence (V2's month-close flow) to mean anything; until then this shows
-// exactly what it says. Returns null when there's no past history point to
-// compare against - callers show an empty state in that case. Returns a
-// fresh object each call; wrap with zustand's useShallow when selecting
-// this directly in a component.
-export const selectNetWorthGrowthSinceLastPoint = (s) => {
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const anchor = [...s.historyPoints]
-    .filter((p) => p.date < todayStr)
-    .sort((a, b) => b.date.localeCompare(a.date))[0]
-  if (!anchor) return null
+export const selectSnapshotsSorted = (s) =>
+  [...s.snapshots].sort((a, b) => a.date.localeCompare(b.date))
 
-  const anchorNetWorth = Number(anchor.totalAssets || 0) - Number(anchor.totalLiabilities || 0)
+export const selectLatestSnapshot = (s) => {
+  const sorted = selectSnapshotsSorted(s)
+  return sorted.length ? sorted[sorted.length - 1] : null
+}
+
+// Whole days since the most recent snapshot's date - drives the "time for a
+// periodic update" nudge. Null when there are no snapshots yet. A plain
+// number, so no useShallow needed.
+export const selectDaysSinceLastSnapshot = (s) => {
+  const latest = selectLatestSnapshot(s)
+  if (!latest) return null
+  return Math.floor((Date.now() - new Date(latest.date).getTime()) / 86_400_000)
+}
+
+// Growth of the live net worth versus the most recent snapshot - the literal
+// total change and percent, never normalized into a per-month rate (see the
+// V1 fix that removed the misleading "monthly" framing). This is the single
+// progress metric the hero and the dashboard KPI both read. Returns null when
+// there's no snapshot to compare against. Returns a fresh object each call;
+// wrap with zustand's useShallow when selecting this directly in a component.
+export const selectNetWorthGrowthSinceLastSnapshot = (s) => {
+  const latest = selectLatestSnapshot(s)
+  if (!latest) return null
+  const anchorNetWorth = getSnapshotTotals(latest).netWorth
   const liveNetWorth = selectNetWorth(s)
   const delta = liveNetWorth - anchorNetWorth
   const percent = anchorNetWorth !== 0 ? (delta / Math.abs(anchorNetWorth)) * 100 : 0
-
-  return { delta, percent, sinceDate: anchor.date }
+  return { delta, percent, sinceDate: latest.date }
 }
 
-// Trend vs the most recent *previous* day we have a recorded snapshot for.
-// Today's own snapshot (recorded on this render) never counts as "previous".
-export const selectNetWorthTrend = (s) => {
-  const today = new Date().toISOString().slice(0, 10)
-  const past = s.netWorthHistory.filter((h) => h.date < today)
-  if (past.length === 0) return null
-  const previous = past[past.length - 1]
-  const current = selectNetWorth(s)
-  const delta = current - previous.netWorth
-  const percent = previous.netWorth !== 0 ? (delta / Math.abs(previous.netWorth)) * 100 : 0
-  return { delta, percent, sinceDate: previous.date }
+// The net-worth line for the dashboard chart: one point per snapshot, plus a
+// live "today" point built from the current state whenever the newest
+// snapshot isn't already dated today. The live point is never persisted - the
+// stored snapshots stay frozen. This is a *pure* builder, not a reactive
+// selector, because it maps snapshots to fresh point objects each call:
+// selecting it directly (even via useShallow) would loop, since useShallow
+// compares array elements by reference. Callers pass the stable `snapshots`
+// array and the live net worth and wrap it in useMemo.
+export function buildNetWorthChartSeries(snapshots, liveNetWorth) {
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const points = [...snapshots]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((snap) => ({
+      date: snap.date,
+      netWorth: getSnapshotTotals(snap).netWorth,
+      isLive: false,
+    }))
+  if (!points.some((p) => p.date === todayStr)) {
+    points.push({ date: todayStr, netWorth: liveNetWorth, isLive: true })
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date))
 }

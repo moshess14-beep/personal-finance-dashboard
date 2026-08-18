@@ -1,11 +1,12 @@
-import { Landmark, CreditCard, Wallet, History as HistoryIcon, Clock } from 'lucide-react'
+import { Landmark, CreditCard, Wallet, Camera, History as HistoryIcon, Clock } from 'lucide-react'
 import { useFinanceStore } from '../store/useFinanceStore'
 
 const ENTITY_ICON = {
   asset: Landmark,
   liability: CreditCard,
   income: Wallet,
-  historyPoint: HistoryIcon,
+  snapshot: Camera,
+  historyPoint: HistoryIcon, // legacy activity-log entries from before V2
 }
 
 const ACTION_LABEL = {
