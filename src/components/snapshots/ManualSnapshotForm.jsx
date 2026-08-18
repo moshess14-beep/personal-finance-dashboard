@@ -6,7 +6,18 @@ import DateField from '../common/DateField'
 const today = () => new Date().toISOString().slice(0, 10)
 const EMPTY = { date: today(), totalAssets: '', totalLiabilities: '', note: '' }
 
-export default function HistoryPointForm({ initialValues, onSubmit, onCancel, submitLabel }) {
+// Used both for adding a manual (totals-only) historical snapshot and for
+// editing an existing snapshot. When `totalsEditable` is false (editing a
+// full snapshot from a period close), the totals come from its frozen items,
+// so we show the net worth read-only and only let the user fix the date/note.
+export default function ManualSnapshotForm({
+  initialValues,
+  totalsEditable = true,
+  readOnlyNetWorth,
+  onSubmit,
+  onCancel,
+  submitLabel,
+}) {
   const [values, setValues] = useState(() => ({ ...EMPTY, ...initialValues }))
   const [error, setError] = useState('')
 
@@ -20,23 +31,27 @@ export default function HistoryPointForm({ initialValues, onSubmit, onCancel, su
       setError('צריך לבחור תאריך')
       return
     }
-    if (values.totalAssets === '' || Number.isNaN(Number(values.totalAssets))) {
-      setError('צריך להזין סך נכסים מספרי')
-      return
+    if (totalsEditable) {
+      if (values.totalAssets === '' || Number.isNaN(Number(values.totalAssets))) {
+        setError('צריך להזין סך נכסים מספרי')
+        return
+      }
+      if (values.totalLiabilities === '' || Number.isNaN(Number(values.totalLiabilities))) {
+        setError('צריך להזין סך התחייבויות מספרי')
+        return
+      }
     }
-    if (values.totalLiabilities === '' || Number.isNaN(Number(values.totalLiabilities))) {
-      setError('צריך להזין סך התחייבויות מספרי')
-      return
+    const out = { date: values.date, note: values.note.trim() }
+    if (totalsEditable) {
+      out.totalAssets = Number(values.totalAssets)
+      out.totalLiabilities = Number(values.totalLiabilities)
     }
-    onSubmit({
-      date: values.date,
-      totalAssets: Number(values.totalAssets),
-      totalLiabilities: Number(values.totalLiabilities),
-      note: values.note.trim(),
-    })
+    onSubmit(out)
   }
 
-  const netWorth = (Number(values.totalAssets) || 0) - (Number(values.totalLiabilities) || 0)
+  const netWorth = totalsEditable
+    ? (Number(values.totalAssets) || 0) - (Number(values.totalLiabilities) || 0)
+    : readOnlyNetWorth
 
   return (
     <form
@@ -44,48 +59,49 @@ export default function HistoryPointForm({ initialValues, onSubmit, onCancel, su
       className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2"
     >
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-          תאריך
-        </label>
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">תאריך</label>
         <DateField value={values.date} onChange={(v) => handleChange('date', v)} />
       </div>
 
       <div className="sm:col-span-1">
         <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-          שווי נקי (מחושב אוטומטית)
+          שווי נקי {totalsEditable ? '(מחושב אוטומטית)' : '(מהפריטים בצילום)'}
         </label>
         <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-200">
           {formatCurrency(netWorth)}
         </p>
       </div>
 
-      <div className="sm:col-span-1">
-        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-          סך נכסים (₪)
-        </label>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={values.totalAssets}
-          onChange={(e) => handleChange('totalAssets', e.target.value)}
-          placeholder="0"
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
-        />
-      </div>
-
-      <div className="sm:col-span-1">
-        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-          סך התחייבויות (₪)
-        </label>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={values.totalLiabilities}
-          onChange={(e) => handleChange('totalLiabilities', e.target.value)}
-          placeholder="0"
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
-        />
-      </div>
+      {totalsEditable && (
+        <>
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+              סך נכסים (₪)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={values.totalAssets}
+              onChange={(e) => handleChange('totalAssets', e.target.value)}
+              placeholder="0"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+              סך התחייבויות (₪)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={values.totalLiabilities}
+              onChange={(e) => handleChange('totalLiabilities', e.target.value)}
+              placeholder="0"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
+        </>
+      )}
 
       <div className="sm:col-span-2">
         <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">

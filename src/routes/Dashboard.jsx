@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { Landmark, CreditCard, PiggyBank, Wallet, TrendingUp } from 'lucide-react'
@@ -10,12 +10,14 @@ import {
   selectTotalMonthlyIncome,
   selectWorkIncome,
   selectAssetIncome,
-  selectNetWorthGrowthSinceLastPoint,
   selectNetWorth,
+  selectNetWorthGrowthSinceLastSnapshot,
+  buildNetWorthChartSeries,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
 import { summarizeByCategory } from '../utils/aggregations'
 import NetWorthHero from '../components/dashboard/NetWorthHero'
+import PeriodUpdateCard from '../components/dashboard/PeriodUpdateCard'
 import StatCard from '../components/dashboard/StatCard'
 import NetWorthProgressChart from '../components/dashboard/NetWorthProgressChart'
 import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
@@ -29,7 +31,6 @@ export default function Dashboard() {
   const assets = useFinanceStore((s) => s.assets)
   const liabilities = useFinanceStore((s) => s.liabilities)
   const incomeSources = useFinanceStore((s) => s.incomeSources)
-  const historyPoints = useFinanceStore((s) => s.historyPoints)
   const assetCategories = useFinanceStore((s) => s.categories.assets)
   const liabilityCategories = useFinanceStore((s) => s.categories.liabilities)
   const incomeCategories = useFinanceStore((s) => s.categories.income)
@@ -39,30 +40,13 @@ export default function Dashboard() {
   const totalMonthlyIncome = useFinanceStore(selectTotalMonthlyIncome)
   const workIncome = useFinanceStore(selectWorkIncome)
   const assetIncome = useFinanceStore(selectAssetIncome)
-  const growthSincePoint = useFinanceStore(useShallow(selectNetWorthGrowthSinceLastPoint))
+  const growth = useFinanceStore(useShallow(selectNetWorthGrowthSinceLastSnapshot))
+  const snapshots = useFinanceStore((s) => s.snapshots)
   const netWorth = useFinanceStore(selectNetWorth)
-  const recordNetWorthSnapshot = useFinanceStore((s) => s.recordNetWorthSnapshot)
-
-  // Lightweight daily history point, so a trend is always available on the
-  // hero without requiring an explicit history point.
-  useEffect(() => {
-    recordNetWorthSnapshot(netWorth)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netWorth])
+  const chartSeries = useMemo(() => buildNetWorthChartSeries(snapshots, netWorth), [snapshots, netWorth])
 
   const hasAnyData = assets.length > 0 || liabilities.length > 0
   const topIncomeCategory = summarizeByCategory(incomeSources, incomeCategories, 'light', 'amount')[0]
-
-  // The chart should always reach "now", not stop at whatever date the last
-  // manual history point happens to be. historyPoints themselves are frozen
-  // snapshots and must never be mutated here - this only appends an extra,
-  // unsaved point built from the live totals for rendering.
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const hasTodayHistoryPoint = historyPoints.some((p) => p.date === todayStr)
-  const chartPoints =
-    historyPoints.length > 0 && !hasTodayHistoryPoint
-      ? [...historyPoints, { id: 'live-today', date: todayStr, totalAssets, totalLiabilities, isLive: true }]
-      : historyPoints
 
   return (
     <div className="space-y-4">
@@ -78,7 +62,9 @@ export default function Dashboard() {
         </p>
       )}
 
-      <NetWorthProgressChart points={chartPoints} delay={0.05} />
+      {hasAnyData && <PeriodUpdateCard delay={0.04} />}
+
+      <NetWorthProgressChart points={chartSeries} delay={0.05} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
@@ -117,19 +103,17 @@ export default function Dashboard() {
         />
         <StatCard
           icon={TrendingUp}
-          label="גידול מאז נקודת ההיסטוריה האחרונה"
+          label="גידול מאז הצילום האחרון"
           value={
-            growthSincePoint
-              ? `${growthSincePoint.delta >= 0 ? '+' : ''}${formatCurrency(growthSincePoint.delta)}`
-              : 'אין עדיין נקודת השוואה'
+            growth
+              ? `${growth.delta >= 0 ? '+' : ''}${formatCurrency(growth.delta)}`
+              : 'אין עדיין צילום'
           }
-          valueClassName={
-            growthSincePoint ? (growthSincePoint.delta >= 0 ? 'text-gain' : 'text-loss') : undefined
-          }
+          valueClassName={growth ? (growth.delta >= 0 ? 'text-gain' : 'text-loss') : undefined}
           subLabel={
-            growthSincePoint
-              ? `${growthSincePoint.delta >= 0 ? '+' : ''}${growthSincePoint.percent.toFixed(1)}% מאז ${sinceDateFormatter.format(new Date(growthSincePoint.sinceDate))}`
-              : 'הוסף נקודת היסטוריה כדי לראות גידול'
+            growth
+              ? `${growth.delta >= 0 ? '+' : ''}${growth.percent.toFixed(1)}% מאז ${sinceDateFormatter.format(new Date(growth.sinceDate))}`
+              : 'סגור תקופה כדי לראות גידול'
           }
           delay={0.22}
           to="/history"
