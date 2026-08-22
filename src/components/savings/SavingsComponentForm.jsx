@@ -5,11 +5,20 @@ const EMPTY = { name: '', category: '', amount: '', note: '' }
 
 export default function SavingsComponentForm({ categories, initialValues, onSubmit, onCancel, submitLabel }) {
   const defaultCategory = categories.find((c) => !c.hidden)?.id ?? categories[0]?.id ?? ''
-  const [values, setValues] = useState(() => ({
-    ...EMPTY,
-    category: defaultCategory,
-    ...initialValues,
-  }))
+  const [values, setValues] = useState(() => {
+    const category = initialValues?.category ?? defaultCategory
+    return {
+      ...EMPTY,
+      category,
+      // Defaults 'independentDeposit' to net-deducted, everything else to
+      // gross - matches the common case (employer-arranged pension/keren
+      // hishtalmut never touch net pay; a self-directed deposit usually
+      // does). Only applies when the item doesn't already have an explicit
+      // value (new item, or one saved before this field existed).
+      deductedFromNet: category === 'independentDeposit',
+      ...initialValues,
+    }
+  })
   const [error, setError] = useState('')
 
   function handleChange(field, val) {
@@ -31,6 +40,7 @@ export default function SavingsComponentForm({ categories, initialValues, onSubm
       category: values.category,
       amount: Number(values.amount),
       note: values.note.trim(),
+      deductedFromNet: values.deductedFromNet,
     })
   }
 
@@ -84,6 +94,39 @@ export default function SavingsComponentForm({ categories, initialValues, onSubm
           placeholder="0"
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950"
         />
+      </div>
+
+      <div className="sm:col-span-1">
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          מנוכה מ
+        </label>
+        <div className="flex overflow-hidden rounded-lg border border-slate-300 text-sm dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => handleChange('deductedFromNet', false)}
+            className={`flex-1 px-3 py-2 transition-colors ${
+              !values.deductedFromNet
+                ? 'bg-brand-600 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            ברוטו
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChange('deductedFromNet', true)}
+            className={`flex-1 px-3 py-2 transition-colors ${
+              values.deductedFromNet
+                ? 'bg-brand-600 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            נטו
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+          קובע אם הרכיב מנוכה גם ביעד לעצמאות כלכלית - רכיב שיורד מהברוטו כבר לא כלול בהכנסה הנטו שהוזנה, ולכן לא מנוכה שוב.
+        </p>
       </div>
 
       <div className="sm:col-span-1">

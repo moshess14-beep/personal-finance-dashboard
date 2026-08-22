@@ -20,15 +20,18 @@ const DEFAULT_CATEGORIES = {
 }
 
 // Defaults match the confirmed financial-independence goal design: 2%/year
-// real-estate appreciation, 10%/year for everything else, 2% inflation.
-// `mode: 'auto'` derives the target from current income/savings (see
-// selectCalculatedTarget); switching to 'manual' freezes it at manualTarget
-// until switched back.
+// real-estate appreciation, 10%/year for market-invested assets, 0%/year for
+// "stable" assets (vehicles, equipment - no market exposure, may even
+// depreciate but default to flat rather than assuming a direction), 2%
+// inflation. `mode: 'auto'` derives the target from current income/savings
+// (see selectCalculatedTarget); switching to 'manual' freezes it at
+// manualTarget until switched back.
 const DEFAULT_FINANCIAL_GOAL = {
   mode: 'auto',
   manualTarget: null,
   inflationRate: 2,
   realEstateGrowthRate: 2,
+  stableGrowthRate: 0,
   otherGrowthRate: 10,
 }
 
@@ -459,6 +462,30 @@ export const selectTotalLoanPrincipalPaydown = (s) =>
 export const selectTotalMonthlySavings = (s) =>
   selectManualMonthlySavings(s) + selectTotalLoanPrincipalPaydown(s)
 
+// Whether a savings component was deducted from the user's *net* pay (as
+// opposed to already being taken out of gross before net pay was
+// calculated, like an employer-arranged pension or keren hishtalmut). Only
+// the former should be subtracted again from net income when estimating net
+// consumption below - subtracting a gross-deducted component too would
+// double-count money the user's net income never included in the first
+// place. Read defensively (no migration): components saved before this
+// field existed default to gross-deducted, except 'independentDeposit'
+// (a self-directed deposit is the one category that's typically net-deducted).
+export const isSavingsDeductedFromNet = (component) =>
+  component.deductedFromNet ?? component.category === 'independentDeposit'
+
+export const selectNetDeductedSavings = (s) =>
+  s.savingsComponents
+    .filter(isSavingsDeductedFromNet)
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0)
+
+// Total monthly loan service (principal + interest) - money that's
+// committed to debt and unavailable for everyday consumption, so it's
+// excluded from the net-consumption estimate below just like net-deducted
+// savings are.
+export const selectTotalLoanMonthlyPayment = (s) =>
+  s.liabilities.reduce((sum, l) => sum + Number(l.monthlyPayment || 0), 0)
+
 export const selectTotalMonthlyIncome = (s) =>
   s.incomeSources.reduce((sum, c) => sum + Number(c.amount || 0), 0)
 
@@ -548,21 +575,32 @@ export function buildNetWorthChartSeries(snapshots, liveNetWorth) {
 }
 
 // Splits current assets by growth bucket for the goals projection - real
-// estate compounds at its own rate, everything else at the general rate.
-export const selectRealEstateValue = (s) => {
-  const realEstateIds = new Set(
-    s.categories.assets.filter((c) => getCategoryGrowthClass(c) === 'realEstate').map((c) => c.id),
+// estate and "stable" (non-market, e.g. vehicles/equipment) assets each
+// compound at their own rate, everything else (actually invested in the
+// capital markets) at the general rate.
+function assetValueByGrowthClass(s, growthClass) {
+  const ids = new Set(
+    s.categories.assets.filter((c) => getCategoryGrowthClass(c) === growthClass).map((c) => c.id),
   )
-  return s.assets.reduce((sum, a) => sum + (realEstateIds.has(a.category) ? Number(a.value || 0) : 0), 0)
+  return s.assets.reduce((sum, a) => sum + (ids.has(a.category) ? Number(a.value || 0) : 0), 0)
 }
 
-export const selectOtherAssetsValue = (s) => selectTotalAssets(s) - selectRealEstateValue(s)
+export const selectRealEstateValue = (s) => assetValueByGrowthClass(s, 'realEstate')
+export const selectStableAssetsValue = (s) => assetValueByGrowthClass(s, 'stable')
+
+export const selectOtherAssetsValue = (s) =>
+  selectTotalAssets(s) - selectRealEstateValue(s) - selectStableAssetsValue(s)
 
 // Net monthly consumption, used as the default financial-independence target
 // base: since the app doesn't track expenses directly, income minus what's
-// saved is a reasonable proxy for what's actually being spent.
+// unavailable for everyday spending is a reasonable proxy for what's
+// actually being spent. "Unavailable" is net-deducted savings (gross-
+// deducted ones - employer pension, employer keren hishtalmut - never
+// showed up in net income to begin with, so subtracting them again would
+// double-count) plus total loan service (principal + interest, committed to
+// debt rather than lifestyle).
 export const selectNetConsumption = (s) =>
-  Math.max(0, selectTotalMonthlyIncome(s) - selectTotalMonthlySavings(s))
+  Math.max(0, selectTotalMonthlyIncome(s) - selectNetDeductedSavings(s) - selectTotalLoanMonthlyPayment(s))
 
 // The "4% rule" FI number: monthly consumption x 12 months / 4% = x 300.
 // This is today's-money target - the goals screen inflates it forward per

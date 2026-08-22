@@ -18,8 +18,8 @@ export const DEFAULT_ASSET_CATEGORIES = [
   { id: 'gemel', label: 'קופות גמל', color: { light: '#e87ba4', dark: '#d55181' } },
   { id: 'childSavings', label: 'חיסכון לכל ילד', color: { light: '#eb6834', dark: '#d95926' } },
   { id: 'investments', label: 'תיק השקעות', color: MUTED },
-  { id: 'vehicles', label: 'רכבים', color: MUTED },
-  { id: 'expensiveEquipment', label: 'ציוד יקר', color: MUTED },
+  { id: 'vehicles', label: 'רכבים', color: MUTED, growthClass: 'stable' },
+  { id: 'expensiveEquipment', label: 'ציוד יקר', color: MUTED, growthClass: 'stable' },
   { id: 'other', label: 'אחר', color: MUTED },
 ]
 
@@ -55,10 +55,13 @@ export function getCategoryColor(categories, id, mode = 'light') {
 
 // Which growth bucket an asset category belongs to for the goals projection
 // (see routes/Goals.jsx): 'realEstate' compounds at the real-estate rate,
-// 'other' at the general-assets rate. Read defensively - categories
-// persisted before this field existed (or synced from an old backup) don't
-// have it, so fall back to the same default the built-in list uses: only the
-// built-in 'realEstate' id counts as real estate, everything else is 'other'.
+// 'stable' at its own rate (for assets with no market exposure - vehicles,
+// equipment - that don't grow like invested assets and may even depreciate),
+// 'other' at the general (market-invested) assets rate. Read defensively -
+// categories persisted before this field existed (or synced from an old
+// backup) don't have it, so fall back to the same default the built-in list
+// uses: only the built-in 'realEstate' id counts as real estate, everything
+// else is 'other'.
 export function getCategoryGrowthClass(category) {
   return category.growthClass ?? (category.id === 'realEstate' ? 'realEstate' : 'other')
 }
