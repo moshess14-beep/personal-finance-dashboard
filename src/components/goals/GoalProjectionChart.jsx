@@ -12,14 +12,26 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatCompactCurrency } from '../../utils/formatCompactCurrency'
 
-const thisYear = new Date().getFullYear()
+const yearFormatter = new Intl.DateTimeFormat('he-IL', { year: 'numeric' })
+const monthYearFormatter = new Intl.DateTimeFormat('he-IL', { month: 'short', year: 'numeric' })
+
+// The series is monthly (see utils/goalProjection.js), so ticks are dates
+// offset from today by `month` months rather than a bare year number.
+function dateAtMonthOffset(monthOffset) {
+  const d = new Date()
+  d.setDate(1)
+  d.setMonth(d.getMonth() + monthOffset)
+  return d
+}
 
 function ProjectionTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const row = payload[0].payload
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-800">
-      <p className="mb-1 font-medium text-slate-500 dark:text-slate-400">שנת {thisYear + row.year}</p>
+      <p className="mb-1 font-medium text-slate-500 dark:text-slate-400">
+        {monthYearFormatter.format(dateAtMonthOffset(row.month))}
+      </p>
       <p className="font-semibold tabular-nums text-brand-600 dark:text-brand-400">
         שווי נקי: {formatCurrency(row.netWorth)}
       </p>
@@ -30,8 +42,8 @@ function ProjectionTooltip({ active, payload }) {
   )
 }
 
-export default function GoalProjectionChart({ series, crossingYear }) {
-  const crossingPoint = crossingYear != null ? series.find((p) => p.year === crossingYear) : null
+export default function GoalProjectionChart({ series, crossingMonth }) {
+  const crossingPoint = crossingMonth != null ? series.find((p) => p.month === crossingMonth) : null
 
   return (
     <div className="h-72">
@@ -45,8 +57,8 @@ export default function GoalProjectionChart({ series, crossingYear }) {
           </defs>
           <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-slate-100 dark:stroke-slate-800" />
           <XAxis
-            dataKey="year"
-            tickFormatter={(y) => thisYear + y}
+            dataKey="month"
+            tickFormatter={(m) => yearFormatter.format(dateAtMonthOffset(m))}
             tick={{ fontSize: 11 }}
             className="fill-slate-400 dark:fill-slate-500"
             axisLine={false}
@@ -84,7 +96,7 @@ export default function GoalProjectionChart({ series, crossingYear }) {
           />
           {crossingPoint && (
             <ReferenceDot
-              x={crossingPoint.year}
+              x={crossingPoint.month}
               y={crossingPoint.netWorth}
               r={6}
               fill="#0ca30c"

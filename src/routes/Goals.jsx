@@ -14,7 +14,11 @@ import {
   selectTotalLoanPrincipalPaydown,
 } from '../store/useFinanceStore'
 import { formatCurrency } from '../utils/formatCurrency'
-import { projectGoalTimeline } from '../utils/goalProjection'
+import { simulateNetWorth, projectGoalTimeline, monthsToReachAmount } from '../utils/goalProjection'
+import { buildMilestones, upcomingMilestones } from '../utils/milestones'
+import { formatMonthsAsDuration } from '../utils/formatDuration'
+import NextMilestoneHero from '../components/goals/NextMilestoneHero'
+import UpcomingMilestonesList from '../components/goals/UpcomingMilestonesList'
 import GoalProjectionChart from '../components/goals/GoalProjectionChart'
 import CategoryGrowthClassifier from '../components/goals/CategoryGrowthClassifier'
 import SuccessMessage from '../components/common/SuccessMessage'
@@ -80,36 +84,54 @@ export default function Goals() {
   const savingsIsHypothetical = Number(whatIf.monthlySavings) !== manualSavings
   const isDirty = ratesDirty || savingsIsHypothetical
 
-  const projection = useMemo(
+  // One net-worth trajectory drives everything below - the overall
+  // (inflation-adjusted) goal and every fixed-amount milestone all read from
+  // the same simulated path, so they can never disagree with each other.
+  const trajectory = useMemo(
     () =>
-      projectGoalTimeline({
+      simulateNetWorth({
         realEstateValue,
         otherAssetsValue,
         liabilitiesValue,
         annualNewSavings: (Number(whatIf.monthlySavings) || 0) * 12,
         annualPrincipalPaydown: principalPaydown * 12,
-        target: effectiveTarget,
-        inflationRate: Number(whatIf.inflationRate) || 0,
         realEstateRate: Number(whatIf.realEstateRate) || 0,
         otherRate: Number(whatIf.otherRate) || 0,
         maxYears: MAX_YEARS,
       }),
-    [realEstateValue, otherAssetsValue, liabilitiesValue, principalPaydown, effectiveTarget, whatIf],
+    [realEstateValue, otherAssetsValue, liabilitiesValue, principalPaydown, whatIf],
   )
+
+  const projection = useMemo(
+    () =>
+      projectGoalTimeline({
+        trajectory,
+        target: effectiveTarget,
+        inflationRate: Number(whatIf.inflationRate) || 0,
+      }),
+    [trajectory, effectiveTarget, whatIf.inflationRate],
+  )
+
+  const milestones = useMemo(() => buildMilestones(effectiveTarget), [effectiveTarget])
+  const upcoming = useMemo(() => upcomingMilestones(milestones, netWorth, 4), [milestones, netWorth])
+  const milestoneRows = useMemo(
+    () => upcoming.map((milestone) => ({ milestone, monthsToReach: monthsToReachAmount(trajectory, milestone.amount) })),
+    [upcoming, trajectory],
+  )
+  const nextMilestoneRow = milestoneRows[0] ?? null
 
   const hasAnyData = assets.length > 0 || liabilities.length > 0
   const progressPct = effectiveTarget > 0 ? Math.min(100, Math.max(0, (netWorth / effectiveTarget) * 100)) : 0
-  const thisYear = new Date().getFullYear()
 
-  // The full MAX_YEARS series is what crossingYear is computed against, but
+  // The full MAX_YEARS series is what crossingMonth is computed against, but
   // charting all of it once the goal is reached early squashes the
-  // interesting part: compounding at 10%/year over 60 years dwarfs a 24-year
-  // crossing point on the same axis. Show a few years of context past the
-  // goal instead of the whole tail; only show the full range when the goal
-  // isn't reached within it.
+  // interesting part: compounding at 10%/year over 60 years dwarfs a
+  // ~25-year crossing point on the same axis. Show a few years of context
+  // past the goal instead of the whole tail; only show the full range when
+  // the goal isn't reached within it.
   const chartSeries =
-    projection.crossingYear != null
-      ? projection.series.slice(0, Math.min(projection.series.length, projection.crossingYear + 6))
+    projection.crossingMonth != null
+      ? projection.series.slice(0, Math.min(projection.series.length, projection.crossingMonth + 60))
       : projection.series
 
   function resetWhatIf() {
@@ -174,11 +196,20 @@ export default function Goals() {
 
       <SuccessMessage message={message} />
 
-      {/* target + progress */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      {/* the near, motivating milestone leads the page */}
+      <NextMilestoneHero
+        milestone={nextMilestoneRow?.milestone ?? null}
+        monthsToReach={nextMilestoneRow?.monthsToReach ?? null}
+        netWorth={netWorth}
+      />
+
+      <UpcomingMilestonesList rows={milestoneRows} />
+
+      {/* overall FI target - secondary, smaller than the milestone above */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">היעד שלי</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">היעד הכללי לעצמאות כלכלית</p>
             {editingTarget ? (
               <div className="mt-1 flex items-center gap-2">
                 <input
@@ -186,7 +217,7 @@ export default function Goals() {
                   autoFocus
                   value={targetDraft}
                   onChange={(e) => setTargetDraft(e.target.value)}
-                  className="w-40 rounded-lg border border-brand-500 bg-white px-3 py-1.5 text-lg font-bold tabular-nums outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-950"
+                  className="w-36 rounded-lg border border-brand-500 bg-white px-3 py-1.5 text-base font-bold tabular-nums outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-950"
                 />
                 <button
                   type="button"
@@ -206,7 +237,7 @@ export default function Goals() {
                 </button>
               </div>
             ) : (
-              <p className="text-3xl font-bold tabular-nums text-slate-900 dark:text-white">
+              <p className="text-xl font-bold tabular-nums text-slate-900 dark:text-white">
                 {formatCurrency(effectiveTarget)}
               </p>
             )}
@@ -240,33 +271,32 @@ export default function Goals() {
           )}
         </div>
 
-        <div className="mt-5">
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full rounded-full bg-brand-600 transition-all"
-              style={{ width: `${progressPct}%` }}
-            />
+        <div className="mt-4">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+            <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${progressPct}%` }} />
           </div>
           <div className="mt-1.5 flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>{formatCurrency(netWorth)} היום</span>
-            <span>{progressPct.toFixed(1)}% מהיעד</span>
+            <span>{progressPct.toFixed(1)}% מהיעד הכללי</span>
           </div>
         </div>
       </div>
 
       {/* projection summary + chart */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">תחזית התקדמות</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">תחזית התקדמות ליעד הכללי</h2>
         <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
-          {projection.crossingYear === 0 ? (
+          {projection.crossingMonth === 0 ? (
             <span className="font-semibold text-gain">כבר הגעת ליעד! 🎉</span>
-          ) : projection.crossingYear != null ? (
+          ) : projection.crossingMonth != null ? (
             <>
-              בקצב הנוכחי תגיע ליעד בעוד{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">{projection.crossingYear} שנים</span>
-              {' '}(בשנת {thisYear + projection.crossingYear}), כשהיעד יעמוד אז על{' '}
+              בקצב הנוכחי תגיע ליעד הכללי בעוד{' '}
               <span className="font-semibold text-slate-900 dark:text-white">
-                {formatCurrency(projection.series[projection.crossingYear].target)}
+                {formatMonthsAsDuration(projection.crossingMonth)}
+              </span>
+              , כשהיעד יעמוד אז על{' '}
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {formatCurrency(projection.series[projection.crossingMonth].target)}
               </span>
               .
             </>
@@ -274,7 +304,7 @@ export default function Goals() {
             `לא צפוי להגיע ליעד תוך ${MAX_YEARS} שנה בהנחות הנוכחיות - נסה להגדיל את קצב החיסכון במחשבון למטה.`
           )}
         </p>
-        <GoalProjectionChart series={chartSeries} crossingYear={projection.crossingYear} />
+        <GoalProjectionChart series={chartSeries} crossingMonth={projection.crossingMonth} />
       </div>
 
       {/* what-if calculator */}
@@ -284,7 +314,7 @@ export default function Goals() {
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">מחשבון "מה אם"</h2>
         </div>
         <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-          שנה חיסכון חודשי או קצבי צמיחה, וראה איך זה משפיע על התחזית למעלה - בלי לשמור כלום, עד שתבחר.
+          שנה חיסכון חודשי או קצבי צמיחה, וראה איך זה משפיע על היעד הבא ועל התחזית הכללית - בלי לשמור כלום, עד שתבחר.
         </p>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
