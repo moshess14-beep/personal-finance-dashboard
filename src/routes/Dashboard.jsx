@@ -18,6 +18,7 @@ import { formatCurrency } from '../utils/formatCurrency'
 import { summarizeByCategory } from '../utils/aggregations'
 import NetWorthHero from '../components/dashboard/NetWorthHero'
 import PeriodUpdateCard from '../components/dashboard/PeriodUpdateCard'
+import GoalProgressCard from '../components/dashboard/GoalProgressCard'
 import StatCard from '../components/dashboard/StatCard'
 import NetWorthProgressChart from '../components/dashboard/NetWorthProgressChart'
 import CategoryDonutChart from '../components/dashboard/CategoryDonutChart'
@@ -62,7 +63,12 @@ export default function Dashboard() {
         </p>
       )}
 
-      {hasAnyData && <PeriodUpdateCard delay={0.04} />}
+      {hasAnyData && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <PeriodUpdateCard delay={0.04} />
+          <GoalProgressCard delay={0.06} />
+        </div>
+      )}
 
       <NetWorthProgressChart points={chartSeries} delay={0.05} />
 

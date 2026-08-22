@@ -7,6 +7,7 @@ import {
   DEFAULT_SAVINGS_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
   MUTED_COLOR,
+  getCategoryGrowthClass,
 } from '../utils/categories'
 
 const now = () => new Date().toISOString()
@@ -16,6 +17,19 @@ const DEFAULT_CATEGORIES = {
   liabilities: DEFAULT_LIABILITY_CATEGORIES,
   income: DEFAULT_INCOME_CATEGORIES,
   savings: DEFAULT_SAVINGS_CATEGORIES,
+}
+
+// Defaults match the confirmed financial-independence goal design: 2%/year
+// real-estate appreciation, 10%/year for everything else, 2% inflation.
+// `mode: 'auto'` derives the target from current income/savings (see
+// selectCalculatedTarget); switching to 'manual' freezes it at manualTarget
+// until switched back.
+const DEFAULT_FINANCIAL_GOAL = {
+  mode: 'auto',
+  manualTarget: null,
+  inflationRate: 2,
+  realEstateGrowthRate: 2,
+  otherGrowthRate: 10,
 }
 
 // Single source of truth for which store keys are actual user data (as
@@ -32,6 +46,7 @@ export const BACKUP_DATA_KEYS = [
   'snapshots',
   'activityLog',
   'categories',
+  'financialGoal',
 ]
 
 function activityEntry(entityType, action, summary) {
@@ -101,6 +116,7 @@ export const useFinanceStore = create(
       snapshots: [],
       activityLog: [],
       categories: DEFAULT_CATEGORIES,
+      financialGoal: DEFAULT_FINANCIAL_GOAL,
 
       // New user-created categories always get the shared muted color -
       // the palette reserves a fixed set of distinct hues for the built-in
@@ -140,6 +156,18 @@ export const useFinanceStore = create(
           if (list.length <= 1) return s
           return { categories: { ...s.categories, [domain]: list.filter((c) => c.id !== id) } }
         }),
+      // Only meaningful for asset categories - which growth bucket the goals
+      // projection sums this category's assets into.
+      setCategoryGrowthClass: (id, growthClass) =>
+        set((s) => ({
+          categories: {
+            ...s.categories,
+            assets: s.categories.assets.map((c) => (c.id === id ? { ...c, growthClass } : c)),
+          },
+        })),
+
+      setFinancialGoal: (patch) =>
+        set((s) => ({ financialGoal: { ...s.financialGoal, ...patch } })),
 
       addAsset: (asset) =>
         set((s) => {
@@ -385,6 +413,7 @@ export const useFinanceStore = create(
           snapshots: data.snapshots ?? historyPointsToSnapshots(data.historyPoints),
           activityLog: data.activityLog ?? [],
           categories: data.categories ?? DEFAULT_CATEGORIES,
+          financialGoal: data.financialGoal ?? DEFAULT_FINANCIAL_GOAL,
         }),
     }),
     {
@@ -413,10 +442,10 @@ export const useFinanceStore = create(
 export const selectTotalAssets = (s) =>
   s.assets.reduce((sum, a) => sum + Number(a.value || 0), 0)
 
-// Manually-entered savings components only - not exported, since nothing
-// outside this file needs just the manual portion; selectTotalMonthlySavings
-// below is the one everything else should read.
-const selectManualMonthlySavings = (s) =>
+// Manually-entered savings components only - the "new money" portion that
+// actually compounds going forward (as opposed to loan-principal paydown,
+// which just shrinks a liability). Used directly by the goals projection.
+export const selectManualMonthlySavings = (s) =>
   s.savingsComponents.reduce((sum, c) => sum + Number(c.amount || 0), 0)
 
 // Paying down loan principal *is* saving (it grows net worth the same way
@@ -517,3 +546,33 @@ export function buildNetWorthChartSeries(snapshots, liveNetWorth) {
   }
   return points.sort((a, b) => a.date.localeCompare(b.date))
 }
+
+// Splits current assets by growth bucket for the goals projection - real
+// estate compounds at its own rate, everything else at the general rate.
+export const selectRealEstateValue = (s) => {
+  const realEstateIds = new Set(
+    s.categories.assets.filter((c) => getCategoryGrowthClass(c) === 'realEstate').map((c) => c.id),
+  )
+  return s.assets.reduce((sum, a) => sum + (realEstateIds.has(a.category) ? Number(a.value || 0) : 0), 0)
+}
+
+export const selectOtherAssetsValue = (s) => selectTotalAssets(s) - selectRealEstateValue(s)
+
+// Net monthly consumption, used as the default financial-independence target
+// base: since the app doesn't track expenses directly, income minus what's
+// saved is a reasonable proxy for what's actually being spent.
+export const selectNetConsumption = (s) =>
+  Math.max(0, selectTotalMonthlyIncome(s) - selectTotalMonthlySavings(s))
+
+// The "4% rule" FI number: monthly consumption x 12 months / 4% = x 300.
+// This is today's-money target - the goals screen inflates it forward per
+// year when projecting, since a target set today loses meaning decades out
+// without adjusting for inflation.
+export const selectCalculatedTarget = (s) => selectNetConsumption(s) * 300
+
+// What the goals screen actually displays and projects against: the
+// calculated target, unless the user pinned a manual override.
+export const selectEffectiveTarget = (s) =>
+  s.financialGoal.mode === 'manual' && s.financialGoal.manualTarget != null
+    ? Number(s.financialGoal.manualTarget)
+    : selectCalculatedTarget(s)

@@ -10,6 +10,7 @@ import Snapshots from './routes/Snapshots'
 import Income from './routes/Income'
 import Timeline from './routes/Timeline'
 import PeriodUpdate from './routes/PeriodUpdate'
+import Goals from './routes/Goals'
 
 function App() {
   const isDark = useThemeStore((s) => s.isDark)
@@ -31,6 +32,7 @@ function App() {
           <Route path="/income" element={<Income />} />
           <Route path="/timeline" element={<Timeline />} />
           <Route path="/update" element={<PeriodUpdate />} />
+          <Route path="/goals" element={<Goals />} />
         </Routes>
       </main>
     </div>

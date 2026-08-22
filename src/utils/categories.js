@@ -10,7 +10,7 @@ const MUTED = MUTED_COLOR
 // users can rename, hide, delete or add to them. Nothing in the app should
 // import these directly except the store itself.
 export const DEFAULT_ASSET_CATEGORIES = [
-  { id: 'realEstate', label: 'נדל"ן', color: { light: '#2a78d6', dark: '#3987e5' } },
+  { id: 'realEstate', label: 'נדל"ן', color: { light: '#2a78d6', dark: '#3987e5' }, growthClass: 'realEstate' },
   { id: 'bankAccounts', label: 'חשבונות בנק', color: { light: '#1baf7a', dark: '#199e70' } },
   { id: 'pension', label: 'פנסיה', color: { light: '#eda100', dark: '#c98500' } },
   { id: 'cash', label: 'מזומן', color: { light: '#008300', dark: '#008300' } },
@@ -51,4 +51,14 @@ export const DEFAULT_INCOME_CATEGORIES = [
 
 export function getCategoryColor(categories, id, mode = 'light') {
   return categories.find((c) => c.id === id)?.color?.[mode] ?? MUTED[mode]
+}
+
+// Which growth bucket an asset category belongs to for the goals projection
+// (see routes/Goals.jsx): 'realEstate' compounds at the real-estate rate,
+// 'other' at the general-assets rate. Read defensively - categories
+// persisted before this field existed (or synced from an old backup) don't
+// have it, so fall back to the same default the built-in list uses: only the
+// built-in 'realEstate' id counts as real estate, everything else is 'other'.
+export function getCategoryGrowthClass(category) {
+  return category.growthClass ?? (category.id === 'realEstate' ? 'realEstate' : 'other')
 }
