@@ -9,7 +9,7 @@ export default function CategoryGrowthClassifier() {
     <div>
       <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">סיווג קטגוריות נכסים</h3>
       <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        קובע לאיזה קצב צמיחה כל קטגוריה משויכת בתחזית - נדל"ן לפי הקצב האיטי, כל השאר לפי קצב הנכסים הכללי.
+        קובע לאיזה קצב צמיחה כל קטגוריה משויכת בתחזית - נדל"ן לפי קצב הנדל"ן, נכסים יציבים (כמו רכבים) לפי קצב משלהם, וכל השאר לפי קצב הנכסים בשוק ההון - רק מה שבאמת מושקע שם עולה בקצב הזה.
       </p>
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
         {categories.map((c) => {
@@ -38,6 +38,17 @@ export default function CategoryGrowthClassifier() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setCategoryGrowthClass(c.id, 'stable')}
+                  className={`px-2.5 py-1.5 transition-colors ${
+                    growthClass === 'stable'
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  נכס יציב
+                </button>
+                <button
+                  type="button"
                   onClick={() => setCategoryGrowthClass(c.id, 'other')}
                   className={`px-2.5 py-1.5 transition-colors ${
                     growthClass === 'other'
@@ -45,7 +56,7 @@ export default function CategoryGrowthClassifier() {
                       : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
                 >
-                  נכס אחר
+                  שוק ההון
                 </button>
               </div>
             </div>

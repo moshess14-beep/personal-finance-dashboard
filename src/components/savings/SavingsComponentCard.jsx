@@ -3,12 +3,14 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatRelativeDate } from '../../utils/formatDate'
 import { getCategoryColor } from '../../utils/categories'
+import { isSavingsDeductedFromNet } from '../../store/useFinanceStore'
 import { useThemeStore } from '../../store/useThemeStore'
 
 export default function SavingsComponentCard({ component, categories, onEdit, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isDark = useThemeStore((s) => s.isDark)
   const color = getCategoryColor(categories, component.category, isDark ? 'dark' : 'light')
+  const deductedFromNet = isSavingsDeductedFromNet(component)
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
@@ -20,6 +22,9 @@ export default function SavingsComponentCard({ component, categories, onEdit, on
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
           {component.name}
+          <span className="mr-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            {deductedFromNet ? 'מנוכה מהנטו' : 'מנוכה מהברוטו'}
+          </span>
         </p>
         {component.note && (
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">{component.note}</p>

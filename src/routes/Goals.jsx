@@ -8,6 +8,7 @@ import {
   selectEffectiveTarget,
   selectNetWorth,
   selectRealEstateValue,
+  selectStableAssetsValue,
   selectOtherAssetsValue,
   selectTotalLiabilities,
   selectManualMonthlySavings,
@@ -55,6 +56,7 @@ export default function Goals() {
   const effectiveTarget = useFinanceStore(selectEffectiveTarget)
   const netWorth = useFinanceStore(selectNetWorth)
   const realEstateValue = useFinanceStore(selectRealEstateValue)
+  const stableAssetsValue = useFinanceStore(selectStableAssetsValue)
   const otherAssetsValue = useFinanceStore(selectOtherAssetsValue)
   const liabilitiesValue = useFinanceStore(selectTotalLiabilities)
   const manualSavings = useFinanceStore(selectManualMonthlySavings)
@@ -71,15 +73,17 @@ export default function Goals() {
     monthlySavings: manualSavings,
     inflationRate: goal.inflationRate,
     realEstateRate: goal.realEstateGrowthRate,
+    stableRate: goal.stableGrowthRate ?? 0,
     otherRate: goal.otherGrowthRate,
   }))
 
-  // Only the three rates are persistable assumptions - monthlySavings here is
+  // Only the four rates are persistable assumptions - monthlySavings here is
   // always hypothetical (real savings are edited on the Savings screen), so
   // it's tracked separately and never blocks the "saved" state.
   const ratesDirty =
     Number(whatIf.inflationRate) !== goal.inflationRate ||
     Number(whatIf.realEstateRate) !== goal.realEstateGrowthRate ||
+    Number(whatIf.stableRate) !== (goal.stableGrowthRate ?? 0) ||
     Number(whatIf.otherRate) !== goal.otherGrowthRate
   const savingsIsHypothetical = Number(whatIf.monthlySavings) !== manualSavings
   const isDirty = ratesDirty || savingsIsHypothetical
@@ -91,15 +95,17 @@ export default function Goals() {
     () =>
       simulateNetWorth({
         realEstateValue,
+        stableAssetsValue,
         otherAssetsValue,
         liabilitiesValue,
         annualNewSavings: (Number(whatIf.monthlySavings) || 0) * 12,
         annualPrincipalPaydown: principalPaydown * 12,
         realEstateRate: Number(whatIf.realEstateRate) || 0,
+        stableRate: Number(whatIf.stableRate) || 0,
         otherRate: Number(whatIf.otherRate) || 0,
         maxYears: MAX_YEARS,
       }),
-    [realEstateValue, otherAssetsValue, liabilitiesValue, principalPaydown, whatIf],
+    [realEstateValue, stableAssetsValue, otherAssetsValue, liabilitiesValue, principalPaydown, whatIf],
   )
 
   const projection = useMemo(
@@ -139,6 +145,7 @@ export default function Goals() {
       monthlySavings: manualSavings,
       inflationRate: goal.inflationRate,
       realEstateRate: goal.realEstateGrowthRate,
+      stableRate: goal.stableGrowthRate ?? 0,
       otherRate: goal.otherGrowthRate,
     })
   }
@@ -147,6 +154,7 @@ export default function Goals() {
     setFinancialGoal({
       inflationRate: Number(whatIf.inflationRate) || 0,
       realEstateGrowthRate: Number(whatIf.realEstateRate) || 0,
+      stableGrowthRate: Number(whatIf.stableRate) || 0,
       otherGrowthRate: Number(whatIf.otherRate) || 0,
     })
     showMessage('ההנחות נשמרו כברירת מחדל')
@@ -244,7 +252,7 @@ export default function Goals() {
             <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               {goal.mode === 'manual'
                 ? 'יעד מותאם אישית'
-                : `מחושב אוטומטית: הכנסה חודשית פחות חיסכון (${formatCurrency(netConsumption)} צריכה נטו) × 300`}
+                : `מחושב אוטומטית: הכנסה נטו פחות חיסכון שיורד מהנטו והחזרי הלוואות (${formatCurrency(netConsumption)} צריכה נטו) × 300`}
             </p>
           </div>
           {!editingTarget && (
@@ -317,7 +325,7 @@ export default function Goals() {
           שנה חיסכון חודשי או קצבי צמיחה, וראה איך זה משפיע על היעד הבא ועל התחזית הכללית - בלי לשמור כלום, עד שתבחר.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <label className="col-span-2 block sm:col-span-1">
             <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
               חיסכון חודשי (₪)
@@ -343,7 +351,12 @@ export default function Goals() {
             onChange={(v) => setWhatIf((s) => ({ ...s, realEstateRate: v }))}
           />
           <RateField
-            label="קצב נכסים אחרים"
+            label="קצב נכסים יציבים"
+            value={whatIf.stableRate}
+            onChange={(v) => setWhatIf((s) => ({ ...s, stableRate: v }))}
+          />
+          <RateField
+            label="קצב שוק ההון"
             value={whatIf.otherRate}
             onChange={(v) => setWhatIf((s) => ({ ...s, otherRate: v }))}
           />

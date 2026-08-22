@@ -1,8 +1,13 @@
 // Month-by-month projection toward a financial-independence target, keeping
-// three cash flows distinct per the confirmed design:
+// four cash flows distinct per the confirmed design:
 //   - real estate compounds alone at its own rate (appreciation only)
-//   - everything else compounds at the general rate AND receives new money
-//     every month from manual savings (deposits keep growing once added)
+//   - "stable" assets (vehicles, equipment - not invested in capital
+//     markets) compound alone at their own rate too, which may be zero or
+//     negative (depreciation) - they never receive new deposits, since new
+//     savings don't get poured into a car
+//   - everything else (actual market-invested assets) compounds at the
+//     general rate AND receives new money every month from manual savings
+//     (deposits keep growing once added)
 //   - loan principal paydown only shrinks liabilities - it never compounds
 // Monthly resolution (rather than yearly) exists so intermediate milestones
 // can report "1 year 2 months" instead of only whole years - annual rates
@@ -14,30 +19,35 @@
 // disagree about what net worth looks like at a given month.
 export function simulateNetWorth({
   realEstateValue,
+  stableAssetsValue = 0,
   otherAssetsValue,
   liabilitiesValue,
   annualNewSavings,
   annualPrincipalPaydown,
   realEstateRate,
+  stableRate = 0,
   otherRate,
   maxYears = 60,
 }) {
   const monthlyRealEstateFactor = (1 + Number(realEstateRate) / 100) ** (1 / 12)
+  const monthlyStableFactor = (1 + Number(stableRate) / 100) ** (1 / 12)
   const monthlyOtherFactor = (1 + Number(otherRate) / 100) ** (1 / 12)
   const monthlyNewSavings = (Number(annualNewSavings) || 0) / 12
   const monthlyPrincipalPaydown = (Number(annualPrincipalPaydown) || 0) / 12
 
   let realEstate = Number(realEstateValue) || 0
+  let stable = Number(stableAssetsValue) || 0
   let other = Number(otherAssetsValue) || 0
   let liabilities = Number(liabilitiesValue) || 0
 
-  const trajectory = [{ month: 0, netWorth: realEstate + other - liabilities }]
+  const trajectory = [{ month: 0, netWorth: realEstate + stable + other - liabilities }]
   const maxMonths = maxYears * 12
   for (let month = 1; month <= maxMonths; month++) {
     realEstate *= monthlyRealEstateFactor
+    stable *= monthlyStableFactor
     other = other * monthlyOtherFactor + monthlyNewSavings
     liabilities = Math.max(0, liabilities - monthlyPrincipalPaydown)
-    trajectory.push({ month, netWorth: realEstate + other - liabilities })
+    trajectory.push({ month, netWorth: realEstate + stable + other - liabilities })
   }
   return trajectory
 }
@@ -54,6 +64,7 @@ export function simulateNetWorth({
 export function projectGoalTimeline({
   trajectory,
   realEstateValue,
+  stableAssetsValue,
   otherAssetsValue,
   liabilitiesValue,
   annualNewSavings,
@@ -61,6 +72,7 @@ export function projectGoalTimeline({
   target,
   inflationRate,
   realEstateRate,
+  stableRate,
   otherRate,
   maxYears = 60,
 }) {
@@ -68,11 +80,13 @@ export function projectGoalTimeline({
     trajectory ??
     simulateNetWorth({
       realEstateValue,
+      stableAssetsValue,
       otherAssetsValue,
       liabilitiesValue,
       annualNewSavings,
       annualPrincipalPaydown,
       realEstateRate,
+      stableRate,
       otherRate,
       maxYears,
     })

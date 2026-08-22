@@ -7,6 +7,7 @@ import {
   selectEffectiveTarget,
   selectNetWorth,
   selectRealEstateValue,
+  selectStableAssetsValue,
   selectOtherAssetsValue,
   selectTotalLiabilities,
   selectManualMonthlySavings,
@@ -25,6 +26,7 @@ export default function GoalProgressCard({ delay = 0 }) {
   const netWorth = useFinanceStore(selectNetWorth)
   const goal = useFinanceStore((s) => s.financialGoal)
   const realEstateValue = useFinanceStore(selectRealEstateValue)
+  const stableAssetsValue = useFinanceStore(selectStableAssetsValue)
   const otherAssetsValue = useFinanceStore(selectOtherAssetsValue)
   const liabilitiesValue = useFinanceStore(selectTotalLiabilities)
   const manualSavings = useFinanceStore(selectManualMonthlySavings)
@@ -38,16 +40,28 @@ export default function GoalProgressCard({ delay = 0 }) {
     if (!nextMilestone) return null
     const trajectory = simulateNetWorth({
       realEstateValue,
+      stableAssetsValue,
       otherAssetsValue,
       liabilitiesValue,
       annualNewSavings: manualSavings * 12,
       annualPrincipalPaydown: principalPaydown * 12,
       realEstateRate: goal.realEstateGrowthRate,
+      stableRate: goal.stableGrowthRate ?? 0,
       otherRate: goal.otherGrowthRate,
       maxYears: 60,
     })
     return { milestone: nextMilestone, monthsToReach: monthsToReachAmount(trajectory, nextMilestone.amount) }
-  }, [target, netWorth, realEstateValue, otherAssetsValue, liabilitiesValue, manualSavings, principalPaydown, goal])
+  }, [
+    target,
+    netWorth,
+    realEstateValue,
+    stableAssetsValue,
+    otherAssetsValue,
+    liabilitiesValue,
+    manualSavings,
+    principalPaydown,
+    goal,
+  ])
 
   return (
     <motion.div
