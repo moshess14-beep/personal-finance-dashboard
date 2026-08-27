@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>ציד פוקימונים 🐾</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div id="title">🐾 ציד פוקימונים</div>
+      <button id="dexBtn" class="pill-btn">📖 האוסף שלי (<span id="dexCount">1</span>)</button>
+    </header>
+
+    <div id="gameWrap">
+      <canvas id="world" width="800" height="560"></canvas>
+
+      <div id="catchPrompt" class="hidden">
+        <button id="catchBtn" class="catch-btn">🔴 זרוק כדור פוקימון!</button>
+      </div>
+
+      <div id="toast" class="hidden"></div>
+
+      <!-- touch controls -->
+      <div id="dpad">
+        <button data-dir="up" class="dbtn dup">▲</button>
+        <button data-dir="left" class="dbtn dleft">◀</button>
+        <button data-dir="right" class="dbtn dright">▶</button>
+        <button data-dir="down" class="dbtn ddown">▼</button>
+      </div>
+    </div>
+
+    <p id="hint">חפשו בעשב הגבוה 🌿 והתקרבו לפוקימונים כדי לתפוס אותם. באוסף שלכם אפשר גם לפתוח כל פוקימון לקרב!</p>
+  </div>
+
+  <!-- catch mini-game overlay -->
+  <div id="catchGame" class="overlay hidden">
+    <div class="catch-panel">
+      <div id="catchCreatureName">מנסים לתפוס...</div>
+      <div class="ring-wrap">
+        <div id="ringOuter" class="ring"></div>
+        <div id="ringSweet" class="ring sweet"></div>
+        <div id="ringTarget">🔴</div>
+      </div>
+      <button id="tapCatch" class="catch-btn big">תפוס עכשיו!</button>
+      <div id="catchResult"></div>
+    </div>
+  </div>
+
+  <!-- pokedex / collection overlay -->
+  <div id="dexOverlay" class="overlay hidden">
+    <div class="dex-panel">
+      <div class="dex-header">
+        <h2>האוסף שלי</h2>
+        <button id="dexClose" class="pill-btn">✖ סגור</button>
+      </div>
+      <div id="dexGrid" class="dex-grid"></div>
+    </div>
+  </div>
+
+  <!-- battle overlay -->
+  <div id="battleOverlay" class="overlay hidden">
+    <div class="battle-panel">
+      <div class="battle-side">
+        <div class="battle-name" id="battleOpponentName">יריב</div>
+        <canvas id="battleOpponentCanvas" width="140" height="120" class="battle-canvas"></canvas>
+        <div class="hp-track"><div id="battleOpponentHp" class="hp-fill"></div></div>
+        <div class="hp-label"></div>
+      </div>
+
+      <div class="battle-vs">⚔️</div>
+
+      <div class="battle-side">
+        <div class="battle-name" id="battlePlayerName">הפוקימון שלי</div>
+        <canvas id="battlePlayerCanvas" width="140" height="120" class="battle-canvas"></canvas>
+        <div class="hp-track"><div id="battlePlayerHp" class="hp-fill"></div></div>
+        <div class="hp-label"></div>
+      </div>
+
+      <p id="battleMessage" class="battle-message">קרב מתחיל!</p>
+
+      <div id="battleParty" class="battle-party"></div>
+
+      <div class="battle-actions">
+        <button id="battleAttack" class="catch-btn big">💥 התקפה!</button>
+        <button id="battleFlee" class="pill-btn">🏳️ יציאה מהקרב</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
