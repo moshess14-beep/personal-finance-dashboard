@@ -4,38 +4,77 @@
   var TILE = 40;
   var COLS = 20;
   var ROWS = 14;
-  var canvas = document.getElementById("world");
-  var ctx = canvas.getContext("2d");
+  var worldCanvas = document.getElementById("world");
+  var worldCtx = worldCanvas.getContext("2d");
 
   var SPECIES = [
-    { id: "pikachu", name: "פיקאצ׳ו", emoji: "⚡🐭", starter: true },
-    { id: "caterpie", name: "קטרפי", emoji: "🐛", tier: "common", weight: 30, difficulty: 0.15 },
-    { id: "pidgey", name: "פיג׳י", emoji: "🐦", tier: "common", weight: 26, difficulty: 0.18 },
-    { id: "squirtle", name: "סקוויירטל", emoji: "🐢", tier: "uncommon", weight: 16, difficulty: 0.32 },
-    { id: "charmander", name: "צ׳רמנדר", emoji: "🦎🔥", tier: "uncommon", weight: 14, difficulty: 0.34 },
-    { id: "bulbasaur", name: "בולבזאור", emoji: "🐸🌱", tier: "uncommon", weight: 14, difficulty: 0.33 },
-    { id: "meowth", name: "מיאוט׳", emoji: "🐱", tier: "rare", weight: 8, difficulty: 0.5 },
-    { id: "psyduck", name: "פסיידאק", emoji: "🦆", tier: "rare", weight: 7, difficulty: 0.52 },
+    { id: "pikachu", name: "פיקאצ׳ו", emoji: "⚡🐭", starter: true, tier: "uncommon" },
+
+    { id: "caterpie", name: "קטרפי", emoji: "🐛", tier: "common", weight: 26, difficulty: 0.15 },
+    { id: "pidgey", name: "פיג׳י", emoji: "🐦", tier: "common", weight: 24, difficulty: 0.18 },
+    { id: "rattata", name: "ראטטה", emoji: "🐭", tier: "common", weight: 22, difficulty: 0.17 },
+    { id: "zubat", name: "זובאט", emoji: "🦇", tier: "common", weight: 18, difficulty: 0.22 },
+
+    { id: "squirtle", name: "סקוויירטל", emoji: "🐢", tier: "uncommon", weight: 14, difficulty: 0.32 },
+    { id: "charmander", name: "צ׳רמנדר", emoji: "🦎🔥", tier: "uncommon", weight: 13, difficulty: 0.34 },
+    { id: "bulbasaur", name: "בולבזאור", emoji: "🐸🌱", tier: "uncommon", weight: 13, difficulty: 0.33 },
+    { id: "growlithe", name: "גראוליית׳", emoji: "🐶🔥", tier: "uncommon", weight: 11, difficulty: 0.37 },
+    { id: "machop", name: "מצ׳וקצ׳וק", emoji: "💪", tier: "uncommon", weight: 10, difficulty: 0.4 },
+
+    { id: "meowth", name: "מיאוט׳", emoji: "🐱", tier: "rare", weight: 7, difficulty: 0.5 },
+    { id: "psyduck", name: "פסיידאק", emoji: "🦆", tier: "rare", weight: 6, difficulty: 0.52 },
     { id: "eevee", name: "איווי", emoji: "🦊", tier: "rare", weight: 6, difficulty: 0.55 },
+    { id: "abra", name: "אברה", emoji: "🔮", tier: "rare", weight: 6, difficulty: 0.56 },
+    { id: "gastly", name: "גאסטלי", emoji: "👻", tier: "rare", weight: 5, difficulty: 0.58 },
+    { id: "venomoth", name: "וונומות׳", emoji: "🦋", tier: "rare", weight: 5, difficulty: 0.6 },
+
     { id: "jigglypuff", name: "ג׳יגליפאף", emoji: "🎀🐹", tier: "epic", weight: 3, difficulty: 0.7 },
+
+    { id: "mew", name: "מיו", emoji: "💗", tier: "legendary", weight: 0.6, difficulty: 0.88 },
+    { id: "mewtwo", name: "מיוטו", emoji: "🟣", tier: "legendary", weight: 0.4, difficulty: 0.92 },
   ];
 
   var CRITTER_LOOK = {
     pikachu: { body: "#f6d229", ears: "pointy", earTip: "#3a3a3a", cheeks: "#e8483c", tail: "zigzag", tailColor: "#f6d229" },
     caterpie: { body: "#8bc34a", ears: "none", segments: true, antenna: "#e8483c" },
     pidgey: { body: "#c9a06c", ears: "none", wings: "#8a6a45", beak: "#e08a3c" },
+    rattata: { body: "#b79bd1", ears: "round", whiskers: true, tail: "thin", tailColor: "#b79bd1", belly: "#efe4f6" },
+    zubat: { body: "#5b4a86", ears: "none", wings: "#3f3164", fangs: true },
+
     squirtle: { body: "#6ec6e6", ears: "round", shell: "#8a5a2e" },
     charmander: { body: "#f2854a", ears: "round", belly: "#ffe0b0", tail: "flame", tailColor: "#ffb236" },
     bulbasaur: { body: "#7bc17e", ears: "round", bulb: "#3f7d3a", leaf: "#5fae52" },
+    growlithe: { body: "#e8842c", ears: "pointy", earTip: "#5a3016", stripes: "#5a3016", collar: "#f7c873", tail: "fur", tailColor: "#e8842c" },
+    machop: { body: "#8a7048", ears: "none", belt: "#3a2a18", muscleArms: "#8a7048", tuft: "#3a2a18" },
+
     meowth: { body: "#f2e6ab", ears: "pointy", earTip: "#f2e6ab", coin: "#e8c94a" },
     psyduck: { body: "#f5e28a", ears: "none", bill: "#e8a23c", tuft: "#e8c94a" },
     eevee: { body: "#c8a06a", ears: "pointy", earTip: "#5a4128", collar: "#efe0c0" },
+    abra: { body: "#c9a8e0", ears: "pointy", earTip: "#9a6ac0", eyesClosed: true, starMark: "#f6d229" },
+    gastly: { body: "#8a5ac8", ears: "none", gasBody: true, grin: true },
+    venomoth: { body: "#a888c8", ears: "none", mothWings: "#c9a8e0", wingSpot: "#5a3a7a", furryAntenna: "#5a3a7a", bigEyes: true },
+
     jigglypuff: { body: "#f6b8d0", ears: "none", curl: "#e88fb0" },
   };
+
+  var TIER_STATS = {
+    common: { hp: 32, atkMin: 4, atkMax: 8 },
+    uncommon: { hp: 44, atkMin: 6, atkMax: 11 },
+    rare: { hp: 58, atkMin: 8, atkMax: 14 },
+    epic: { hp: 72, atkMin: 10, atkMax: 17 },
+    legendary: { hp: 100, atkMin: 15, atkMax: 24 },
+  };
+  var FAINT_REST_MS = 60000;
+
   var CATCHABLE = SPECIES.filter(function (s) { return !s.starter; });
   var TOTAL_WEIGHT = CATCHABLE.reduce(function (sum, s) { return sum + s.weight; }, 0);
 
-  var SAVE_KEY = "pokemonCatchGame.save.v1";
+  function speciesById(id) {
+    for (var i = 0; i < SPECIES.length; i++) if (SPECIES[i].id === id) return SPECIES[i];
+    return null;
+  }
+
+  var SAVE_KEY = "pokemonCatchGame.save.v2";
   var state = loadSave();
 
   var map = generateMap();
@@ -179,6 +218,18 @@
     document.getElementById("dexBtn").addEventListener("click", openDex);
     document.getElementById("dexClose").addEventListener("click", closeDex);
     document.getElementById("tapCatch").addEventListener("click", resolveCatchTap);
+
+    document.getElementById("dexGrid").addEventListener("click", function (e) {
+      var btn = e.target.closest(".dex-battle-btn");
+      if (btn) startBattle(btn.getAttribute("data-species"));
+    });
+
+    document.getElementById("battleAttack").addEventListener("click", playerAttack);
+    document.getElementById("battleFlee").addEventListener("click", closeBattle);
+    document.getElementById("battleParty").addEventListener("click", function (e) {
+      var btn = e.target.closest(".party-chip");
+      if (btn && !btn.disabled) selectActiveBattler(btn.getAttribute("data-species"));
+    });
   }
 
   function keyToDir(key) {
@@ -208,7 +259,11 @@
     var dt = lastTime ? ts - lastTime : 16;
     lastTime = ts;
 
-    if (!document.getElementById("catchGame").classList.contains("hidden")) {
+    var paused =
+      !document.getElementById("catchGame").classList.contains("hidden") ||
+      !document.getElementById("battleOverlay").classList.contains("hidden");
+
+    if (paused) {
       requestAnimationFrame(loop);
       return;
     }
@@ -217,7 +272,7 @@
     updateTrail();
     updateWildCreatures(ts, dt);
     updateCatchPrompt();
-    render(ts);
+    renderWorld();
 
     requestAnimationFrame(loop);
   }
@@ -316,7 +371,7 @@
   var catchState = null;
 
   function openCatchGame(target) {
-    var species = SPECIES.find(function (s) { return s.id === target.speciesId; });
+    var species = speciesById(target.speciesId);
     document.getElementById("catchCreatureName").textContent =
       "מנסים לתפוס: " + species.name + " " + species.emoji;
     document.getElementById("catchResult").textContent = "";
@@ -411,18 +466,167 @@
     wildCreatures = wildCreatures.filter(function (w) { return w.id !== id; });
   }
 
+  // ---------- battle ----------
+
+  var battle = null;
+  var battlePlayerCanvas = document.getElementById("battlePlayerCanvas");
+  var battlePlayerCtx = battlePlayerCanvas.getContext("2d");
+  var battleOpponentCanvas = document.getElementById("battleOpponentCanvas");
+  var battleOpponentCtx = battleOpponentCanvas.getContext("2d");
+
+  function isResting(speciesId) {
+    var until = state.restUntil[speciesId];
+    return until && until > Date.now();
+  }
+
+  function ownedHealthySpecies() {
+    return Object.keys(state.dex).filter(function (id) { return !isResting(id); });
+  }
+
+  function makeFighter(speciesId) {
+    var species = speciesById(speciesId);
+    var stats = TIER_STATS[species.tier] || TIER_STATS.common;
+    return { speciesId: speciesId, species: species, hp: stats.hp, maxHp: stats.hp, atkMin: stats.atkMin, atkMax: stats.atkMax };
+  }
+
+  function startBattle(opponentSpeciesId) {
+    var starter = ownedHealthySpecies()[0] || (isResting("pikachu") ? null : "pikachu");
+    if (!starter) {
+      showToast("כל הפוקימונים שלך עייפים כרגע, נסו שוב עוד רגע 😴");
+      return;
+    }
+    battle = {
+      opponent: makeFighter(opponentSpeciesId),
+      player: makeFighter(starter),
+      over: false,
+      busy: false,
+    };
+    document.getElementById("battleOverlay").classList.remove("hidden");
+    document.getElementById("dexOverlay").classList.add("hidden");
+    setBattleMessage("קרב מתחיל! " + battle.opponent.species.name + " הופיע!");
+    renderBattleParty();
+    renderBattlePanels();
+  }
+
+  function selectActiveBattler(speciesId) {
+    if (!battle || battle.over || battle.busy) return;
+    if (isResting(speciesId)) return;
+    battle.player = makeFighter(speciesId);
+    setBattleMessage(battle.player.species.name + " נכנס לקרב!");
+    renderBattleParty();
+    renderBattlePanels();
+  }
+
+  function playerAttack() {
+    if (!battle || battle.over || battle.busy || battle.player.hp <= 0) return;
+    battle.busy = true;
+
+    var dmg = randInt(battle.player.atkMin, battle.player.atkMax);
+    battle.opponent.hp = Math.max(0, battle.opponent.hp - dmg);
+    setBattleMessage(battle.player.species.name + " תוקף! -" + dmg + " ל" + battle.opponent.species.name);
+    renderBattlePanels();
+
+    if (battle.opponent.hp <= 0) {
+      setTimeout(function () {
+        state.battlesWon = (state.battlesWon || 0) + 1;
+        persist();
+        battle.over = true;
+        battle.busy = false;
+        setBattleMessage("ניצחתם! 🏆 " + battle.opponent.species.name + " ברח מהקרב.");
+        renderBattlePanels();
+      }, 400);
+      return;
+    }
+
+    setTimeout(function () {
+      var back = randInt(battle.opponent.atkMin, battle.opponent.atkMax);
+      battle.player.hp = Math.max(0, battle.player.hp - back);
+      var message = battle.opponent.species.name + " עונה! -" + back + " ל" + battle.player.species.name;
+
+      if (battle.player.hp <= 0) {
+        state.restUntil[battle.player.speciesId] = Date.now() + FAINT_REST_MS;
+        persist();
+        renderBattleParty();
+        var nextHealthy = ownedHealthySpecies().filter(function (id) { return id !== battle.player.speciesId; })[0];
+        if (nextHealthy) {
+          message = battle.player.species.name + " עייף... בחרו פוקימון אחר להמשיך!";
+        } else {
+          message = battle.player.species.name + " עייף, וגם כל השאר צריכים לנוח. חוזרים בעוד קצת!";
+          battle.over = true;
+        }
+      }
+
+      battle.busy = false;
+      setBattleMessage(message);
+      renderBattlePanels();
+    }, 900);
+  }
+
+  function renderBattleParty() {
+    var wrap = document.getElementById("battleParty");
+    wrap.innerHTML = "";
+    Object.keys(state.dex).forEach(function (id) {
+      var species = speciesById(id);
+      if (!species) return;
+      var resting = isResting(id);
+      var active = battle && battle.player && battle.player.speciesId === id;
+      var chip = document.createElement("button");
+      chip.className = "party-chip" + (active ? " active" : "") + (resting ? " resting" : "");
+      chip.setAttribute("data-species", id);
+      chip.disabled = resting;
+      chip.innerHTML = '<span class="party-emoji">' + species.emoji + "</span>" + (resting ? "😪" : "");
+      wrap.appendChild(chip);
+    });
+  }
+
+  function renderBattlePanels() {
+    document.getElementById("battleOpponentName").textContent = battle.opponent.species.name + " " + battle.opponent.species.emoji;
+    document.getElementById("battlePlayerName").textContent = battle.player.species.name + " " + battle.player.species.emoji;
+    setHpBar("battleOpponentHp", battle.opponent.hp, battle.opponent.maxHp);
+    setHpBar("battlePlayerHp", battle.player.hp, battle.player.maxHp);
+
+    battleOpponentCtx.clearRect(0, 0, battleOpponentCanvas.width, battleOpponentCanvas.height);
+    drawCritter(battleOpponentCtx, battle.opponent.speciesId, battleOpponentCanvas.width / 2, battleOpponentCanvas.height / 2 + 10, 34);
+
+    battlePlayerCtx.clearRect(0, 0, battlePlayerCanvas.width, battlePlayerCanvas.height);
+    drawCritter(battlePlayerCtx, battle.player.speciesId, battlePlayerCanvas.width / 2, battlePlayerCanvas.height / 2 + 10, 34);
+
+    var attackBtn = document.getElementById("battleAttack");
+    attackBtn.disabled = battle.over || battle.busy || battle.player.hp <= 0;
+  }
+
+  function setHpBar(id, hp, maxHp) {
+    var pct = Math.max(0, Math.round((hp / maxHp) * 100));
+    var fill = document.getElementById(id);
+    fill.style.width = pct + "%";
+    fill.className = "hp-fill" + (pct <= 25 ? " low" : pct <= 55 ? " mid" : "");
+    fill.parentElement.nextElementSibling.textContent = hp + " / " + maxHp;
+  }
+
+  function setBattleMessage(msg) {
+    document.getElementById("battleMessage").textContent = msg;
+  }
+
+  function closeBattle() {
+    document.getElementById("battleOverlay").classList.add("hidden");
+    battle = null;
+  }
+
   // ---------- dex / persistence ----------
 
   function loadSave() {
+    var fallback = { dex: { pikachu: 1 }, playerPos: null, restUntil: {}, battlesWon: 0 };
     try {
       var raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return { dex: { pikachu: 1 }, playerPos: null };
+      if (!raw) return fallback;
       var parsed = JSON.parse(raw);
       if (!parsed.dex) parsed.dex = {};
       if (!parsed.dex.pikachu) parsed.dex.pikachu = 1;
+      if (!parsed.restUntil) parsed.restUntil = {};
+      if (typeof parsed.battlesWon !== "number") parsed.battlesWon = 0;
       return parsed;
     } catch (e) {
-      return { dex: { pikachu: 1 }, playerPos: null };
+      return fallback;
     }
   }
 
@@ -446,15 +650,16 @@
   function openDex() {
     var grid = document.getElementById("dexGrid");
     grid.innerHTML = "";
-    SPECIES.forEach(function (s) {
+    SPECIES.filter(function (s) { return !s.starter; }).forEach(function (s) {
       var count = state.dex[s.id] || 0;
       var owned = count > 0;
       var item = document.createElement("div");
-      item.className = "dex-item " + (owned ? "owned" : "locked");
+      item.className = "dex-item " + (owned ? "owned" : "locked") + " tier-" + s.tier;
       item.innerHTML =
         '<span class="dex-emoji">' + (owned ? s.emoji : "❔") + "</span>" +
-        (owned ? s.name : "???") +
-        (owned ? '<div class="dex-count">x' + count + "</div>" : "");
+        '<span class="dex-name">' + (owned ? s.name : "???") + "</span>" +
+        (owned ? '<span class="dex-count">x' + count + "</span>" : "") +
+        (owned ? '<button class="dex-battle-btn" data-species="' + s.id + '">⚔️ קרב</button>' : "");
       grid.appendChild(item);
     });
     document.getElementById("dexOverlay").classList.remove("hidden");
@@ -473,43 +678,45 @@
     toastHandle = setTimeout(function () { el.classList.add("hidden"); }, 2200);
   }
 
-  // ---------- render ----------
+  // ---------- render: world ----------
 
   var GRASS_SHADES = ["#3fa85c", "#3a9c55", "#44b063"];
 
-  function render(ts) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function renderWorld() {
+    worldCtx.clearRect(0, 0, worldCanvas.width, worldCanvas.height);
 
     for (var r = 0; r < ROWS; r++) {
       for (var c = 0; c < COLS; c++) {
-        drawTile(map[r][c], c * TILE, r * TILE);
+        drawTile(worldCtx, map[r][c], c * TILE, r * TILE);
       }
     }
 
     wildCreatures.forEach(function (w) {
       var bobY = Math.sin(w.bob) * 3;
-      drawShadow(w.x, w.y + 12);
-      drawCritter(w.speciesId, w.x, w.y + bobY, 15);
+      drawShadow(worldCtx, w.x, w.y + 12);
+      drawCritter(worldCtx, w.speciesId, w.x, w.y + bobY, 15);
     });
 
     if (trail.length) {
       var lagged = trail[0];
-      drawShadow(lagged.x, lagged.y + 14);
-      drawCritter("pikachu", lagged.x, lagged.y, 12);
+      drawShadow(worldCtx, lagged.x, lagged.y + 14);
+      drawCritter(worldCtx, "pikachu", lagged.x, lagged.y, 12);
     }
 
-    drawShadow(player.x, player.y + 14);
-    drawPlayer(player.x, player.y, player.facing);
+    drawShadow(worldCtx, player.x, player.y + 14);
+    drawPlayer(worldCtx, player.x, player.y, player.facing);
   }
 
-  function drawPlayer(x, y, facing) {
+  function drawPlayer(ctx, x, y, facing) {
     var scaleX = facing === "left" ? -1 : 1;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scaleX, 1);
 
     ctx.fillStyle = "#3a7bd5";
-    roundedBody(0, 8, 11, 13);
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 11, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = "#f2c48d";
     ctx.beginPath();
@@ -522,6 +729,11 @@
     ctx.fill();
     ctx.fillRect(-9.5, -13, 19, 3);
 
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(-3, -10, 3, 1.6, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle = "#2b2b2b";
     ctx.beginPath();
     ctx.arc(-3, -7, 1.4, 0, Math.PI * 2);
@@ -531,13 +743,17 @@
     ctx.restore();
   }
 
-  function roundedBody(cx, cy, rx, ry) {
+  function drawGloss(ctx, r) {
+    ctx.fillStyle = "rgba(255,255,255,0.32)";
     ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(-r * 0.32, -r * 0.42, r * 0.32, r * 0.2, -0.4, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  function drawCritter(speciesId, x, y, r) {
+  function drawCritter(ctx, speciesId, x, y, r) {
+    if (speciesId === "mew") return drawMew(ctx, x, y, r);
+    if (speciesId === "mewtwo") return drawMewtwo(ctx, x, y, r);
+
     var look = CRITTER_LOOK[speciesId];
     if (!look) return;
     ctx.save();
@@ -561,15 +777,32 @@
       ctx.quadraticCurveTo(r * 1.5, -r * 0.3, r * 0.9, r * 0.4);
       ctx.fill();
     }
+    if (look.tail === "thin") {
+      ctx.strokeStyle = look.tailColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.6, r * 0.1);
+      ctx.quadraticCurveTo(r * 1.5, -r * 0.1, r * 1.7, r * 0.5);
+      ctx.stroke();
+    }
+    if (look.tail === "fur") {
+      ctx.fillStyle = look.tailColor;
+      var tuftSpots = [[r * 0.9, -r * 0.1], [r * 1.25, -r * 0.35], [r * 1.4, r * 0.05], [r * 1.1, r * 0.2]];
+      tuftSpots.forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], r * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
     if (look.ears === "pointy") {
       ctx.fillStyle = look.body;
-      triangle(-r * 0.6, -r * 0.6, -r * 0.9, -r * 1.6, -r * 0.15, -r * 0.9);
-      triangle(r * 0.6, -r * 0.6, r * 0.9, -r * 1.6, r * 0.15, -r * 0.9);
+      triangle(ctx, -r * 0.6, -r * 0.6, -r * 0.9, -r * 1.6, -r * 0.15, -r * 0.9);
+      triangle(ctx, r * 0.6, -r * 0.6, r * 0.9, -r * 1.6, r * 0.15, -r * 0.9);
       if (look.earTip) {
         ctx.fillStyle = look.earTip;
-        triangle(-r * 0.75, -r * 1.1, -r * 0.9, -r * 1.6, -r * 0.55, -r * 1.15);
-        triangle(r * 0.75, -r * 1.1, r * 0.9, -r * 1.6, r * 0.55, -r * 1.15);
+        triangle(ctx, -r * 0.75, -r * 1.1, -r * 0.9, -r * 1.6, -r * 0.55, -r * 1.15);
+        triangle(ctx, r * 0.75, -r * 1.1, r * 0.9, -r * 1.6, r * 0.55, -r * 1.15);
       }
     } else if (look.ears === "round") {
       ctx.fillStyle = look.body;
@@ -585,7 +818,7 @@
       ctx.ellipse(0, -r * 0.9, r * 0.55, r * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = look.leaf;
-      triangle(0, -r * 1.3, -r * 0.35, -r * 0.95, r * 0.35, -r * 0.95);
+      triangle(ctx, 0, -r * 1.3, -r * 0.35, -r * 0.95, r * 0.35, -r * 0.95);
     }
     if (look.shell) {
       ctx.fillStyle = look.shell;
@@ -595,8 +828,24 @@
     }
     if (look.wings) {
       ctx.fillStyle = look.wings;
-      triangle(-r * 0.4, -r * 0.1, -r * 1.3, -r * 0.4, -r * 0.5, r * 0.5);
-      triangle(r * 0.4, -r * 0.1, r * 1.3, -r * 0.4, r * 0.5, r * 0.5);
+      triangle(ctx, -r * 0.4, -r * 0.1, -r * 1.3, -r * 0.4, -r * 0.5, r * 0.5);
+      triangle(ctx, r * 0.4, -r * 0.1, r * 1.3, -r * 0.4, r * 0.5, r * 0.5);
+    }
+    if (look.mothWings) {
+      ctx.fillStyle = look.mothWings;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.95, -r * 0.15, r * 0.68, r * 0.9, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(r * 0.95, -r * 0.15, r * 0.68, r * 0.9, 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      if (look.wingSpot) {
+        ctx.fillStyle = look.wingSpot;
+        ctx.beginPath();
+        ctx.arc(-r * 0.95, -r * 0.15, r * 0.2, 0, Math.PI * 2);
+        ctx.arc(r * 0.95, -r * 0.15, r * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     if (look.collar) {
       ctx.fillStyle = look.collar;
@@ -611,14 +860,69 @@
       ctx.arc(0, -r * 1.5, r * 0.22, 0, Math.PI * 1.6);
       ctx.stroke();
     }
+    if (look.furryAntenna) {
+      ctx.strokeStyle = look.furryAntenna;
+      ctx.lineWidth = 2.4;
+      [-1, 1].forEach(function (side) {
+        ctx.beginPath();
+        ctx.moveTo(side * r * 0.22, -r * 0.85);
+        ctx.quadraticCurveTo(side * r * 0.5, -r * 1.3, side * r * 0.35, -r * 1.55);
+        ctx.stroke();
+        for (var i = 0.3; i <= 0.9; i += 0.3) {
+          ctx.beginPath();
+          ctx.arc(side * r * (0.22 + i * 0.22), -r * (0.85 + i * 0.6), r * 0.05, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+    if (look.muscleArms) {
+      ctx.fillStyle = look.muscleArms;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.95, r * 0.1, r * 0.28, r * 0.4, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.95, r * 0.1, r * 0.28, r * 0.4, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.fillStyle = look.body;
     ctx.beginPath();
     ctx.ellipse(0, 0, r, r * 0.92, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.22)";
-    ctx.lineWidth = 1.3;
+    ctx.lineWidth = 1.4;
     ctx.stroke();
+
+    if (look.gasBody) {
+      ctx.fillStyle = look.body;
+      var puffs = [[-r * 0.5, r * 0.55], [r * 0.55, r * 0.5], [0, r * 0.75]];
+      puffs.forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], r * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    if (look.stripes) {
+      ctx.strokeStyle = look.stripes;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, -r * 0.5);
+      ctx.lineTo(-r * 0.2, r * 0.4);
+      ctx.moveTo(r * 0.1, -r * 0.55);
+      ctx.lineTo(r * 0.4, r * 0.35);
+      ctx.stroke();
+    }
+
+    if (look.belt) {
+      ctx.fillStyle = look.belt;
+      ctx.fillRect(-r, r * 0.15, r * 2, r * 0.24);
+    }
+
+    if (look.belly) {
+      ctx.fillStyle = look.belly;
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.32, r * 0.52, r * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     if (look.segments) {
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
@@ -644,6 +948,15 @@
       ctx.ellipse(0, r * 0.15, r * 0.5, r * 0.25, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (look.beak) {
+      ctx.fillStyle = look.beak;
+      triangle(ctx, 0, r * 0.05, -r * 0.18, r * 0.28, r * 0.18, r * 0.28);
+    }
+    if (look.fangs) {
+      ctx.fillStyle = "#fff";
+      triangle(ctx, -r * 0.22, r * 0.1, -r * 0.3, r * 0.35, -r * 0.12, r * 0.15);
+      triangle(ctx, r * 0.22, r * 0.1, r * 0.3, r * 0.35, r * 0.12, r * 0.15);
+    }
     if (look.tuft) {
       ctx.strokeStyle = look.tuft;
       ctx.lineWidth = 3;
@@ -658,6 +971,33 @@
       ctx.arc(0, -r * 1.05, r * 0.22, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (look.starMark) {
+      ctx.fillStyle = look.starMark;
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.55, r * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (look.grin) {
+      ctx.strokeStyle = "#2b2b2b";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, r * 0.05, r * 0.4, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+    }
+    if (look.whiskers) {
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 1;
+      [-1, 1].forEach(function (side) {
+        ctx.beginPath();
+        ctx.moveTo(side * r * 0.4, r * 0.15);
+        ctx.lineTo(side * r * 0.95, r * 0.05);
+        ctx.moveTo(side * r * 0.4, r * 0.25);
+        ctx.lineTo(side * r * 0.95, r * 0.3);
+        ctx.stroke();
+      });
+    }
+
+    drawGloss(ctx, r);
 
     if (look.cheeks) {
       ctx.fillStyle = look.cheeks;
@@ -667,16 +1007,149 @@
       ctx.fill();
     }
 
+    var eyeR = look.bigEyes ? r * 0.2 : r * 0.14;
+    if (look.eyesClosed) {
+      ctx.strokeStyle = "#2b2b2b";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(-r * 0.32, -r * 0.05, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.arc(r * 0.32, -r * 0.05, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#2b2b2b";
+      ctx.beginPath();
+      ctx.arc(-r * 0.32, -r * 0.1, eyeR, 0, Math.PI * 2);
+      ctx.arc(r * 0.32, -r * 0.1, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(-r * 0.27, -r * 0.14, eyeR * 0.3, 0, Math.PI * 2);
+      ctx.arc(r * 0.37, -r * 0.14, eyeR * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawMew(ctx, x, y, r) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.95, r * 1.3, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#f7b8d0";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.6, r * 0.3);
+    ctx.bezierCurveTo(r * 1.6, r * 0.2, r * 1.8, -r * 0.6, r * 1.1, -r * 0.9);
+    ctx.stroke();
+
+    ctx.fillStyle = "#f8c6dc";
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.15, r * 0.72, r * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    ctx.fillStyle = "#fbd3e6";
+    ctx.beginPath();
+    ctx.arc(-r * 0.55, -r * 1.05, r * 0.22, 0, Math.PI * 2);
+    ctx.arc(r * 0.55, -r * 1.05, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.55, r * 0.85, r * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    drawGloss(ctx, r);
+
     ctx.fillStyle = "#2b2b2b";
     ctx.beginPath();
-    ctx.arc(-r * 0.32, -r * 0.1, r * 0.14, 0, Math.PI * 2);
-    ctx.arc(r * 0.32, -r * 0.1, r * 0.14, 0, Math.PI * 2);
+    ctx.arc(-r * 0.32, -r * 0.55, r * 0.16, 0, Math.PI * 2);
+    ctx.arc(r * 0.32, -r * 0.55, r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(-r * 0.27, -r * 0.6, r * 0.05, 0, Math.PI * 2);
+    ctx.arc(r * 0.37, -r * 0.6, r * 0.05, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
   }
 
-  function triangle(x1, y1, x2, y2, x3, y3) {
+  function drawMewtwo(ctx, x, y, r) {
+    var R = r * 1.5;
+    ctx.save();
+    ctx.translate(x, y);
+
+    ctx.strokeStyle = "#b8a8c8";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(R * 0.1, R * 0.7);
+    ctx.bezierCurveTo(R * 0.9, R * 0.6, R * 1.1, R * 0.1, R * 0.75, -R * 0.15);
+    ctx.stroke();
+    ctx.fillStyle = "#8a76a0";
+    ctx.beginPath();
+    ctx.ellipse(R * 0.75, -R * 0.15, R * 0.12, R * 0.09, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#7a6890";
+    ctx.beginPath();
+    ctx.ellipse(-R * 0.28, R * 0.85, R * 0.16, R * 0.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(R * 0.28, R * 0.85, R * 0.16, R * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#9d89b5";
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.55, R * 0.5);
+    ctx.quadraticCurveTo(-R * 0.62, -R * 0.15, -R * 0.32, -R * 0.35);
+    ctx.lineTo(R * 0.32, -R * 0.35);
+    ctx.quadraticCurveTo(R * 0.62, -R * 0.15, R * 0.55, R * 0.5);
+    ctx.quadraticCurveTo(0, R * 0.65, -R * 0.55, R * 0.5);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = "#8a76a0";
+    ctx.beginPath();
+    ctx.ellipse(-R * 0.68, R * 0.05, R * 0.14, R * 0.32, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(R * 0.68, R * 0.05, R * 0.14, R * 0.32, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#6a5880";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.2, -R * 0.32);
+    ctx.lineTo(-R * 0.28, -R * 0.52);
+    ctx.moveTo(R * 0.2, -R * 0.32);
+    ctx.lineTo(R * 0.28, -R * 0.52);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ab97c2";
+    ctx.beginPath();
+    ctx.ellipse(0, -R * 0.65, R * 0.4, R * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.stroke();
+
+    drawGloss(ctx, R * 0.6);
+
+    ctx.fillStyle = "#5b2f8a";
+    ctx.beginPath();
+    ctx.ellipse(-R * 0.15, -R * 0.68, R * 0.09, R * 0.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(R * 0.15, -R * 0.68, R * 0.09, R * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function triangle(ctx, x1, y1, x2, y2, x3, y3) {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -685,7 +1158,7 @@
     ctx.fill();
   }
 
-  function drawTile(tile, x, y) {
+  function drawTile(ctx, tile, x, y) {
     if (tile.type === "path") {
       ctx.fillStyle = "#d8b978";
     } else if (tile.type === "tallgrass") {
@@ -708,7 +1181,7 @@
     }
 
     if (tile.flower) {
-      drawFlower(x + TILE / 2, y + TILE / 2 + 5);
+      drawFlower(ctx, x + TILE / 2, y + TILE / 2 + 5);
     }
 
     if (tile.type === "tree") {
@@ -728,14 +1201,14 @@
     }
   }
 
-  function drawShadow(x, y) {
+  function drawShadow(ctx, x, y) {
     ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.beginPath();
     ctx.ellipse(x, y, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  function drawFlower(x, y) {
+  function drawFlower(ctx, x, y) {
     ctx.fillStyle = "#ffef7a";
     ctx.beginPath();
     ctx.arc(x, y, 1.6, 0, Math.PI * 2);
@@ -752,5 +1225,9 @@
 
   function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
+  }
+
+  function randInt(min, max) {
+    return Math.floor(min + Math.random() * (max - min + 1));
   }
 })();

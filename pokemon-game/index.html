@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <p id="hint">חפשו בעשב הגבוה 🌿 והתקרבו לפוקימונים כדי לתפוס אותם. לא כולם נתפסים בפעם הראשונה!</p>
+    <p id="hint">חפשו בעשב הגבוה 🌿 והתקרבו לפוקימונים כדי לתפוס אותם. באוסף שלכם אפשר גם לפתוח כל פוקימון לקרב!</p>
   </div>
 
   <!-- catch mini-game overlay -->
@@ -56,6 +56,36 @@
         <button id="dexClose" class="pill-btn">✖ סגור</button>
       </div>
       <div id="dexGrid" class="dex-grid"></div>
+    </div>
+  </div>
+
+  <!-- battle overlay -->
+  <div id="battleOverlay" class="overlay hidden">
+    <div class="battle-panel">
+      <div class="battle-side">
+        <div class="battle-name" id="battleOpponentName">יריב</div>
+        <canvas id="battleOpponentCanvas" width="140" height="120" class="battle-canvas"></canvas>
+        <div class="hp-track"><div id="battleOpponentHp" class="hp-fill"></div></div>
+        <div class="hp-label"></div>
+      </div>
+
+      <div class="battle-vs">⚔️</div>
+
+      <div class="battle-side">
+        <div class="battle-name" id="battlePlayerName">הפוקימון שלי</div>
+        <canvas id="battlePlayerCanvas" width="140" height="120" class="battle-canvas"></canvas>
+        <div class="hp-track"><div id="battlePlayerHp" class="hp-fill"></div></div>
+        <div class="hp-label"></div>
+      </div>
+
+      <p id="battleMessage" class="battle-message">קרב מתחיל!</p>
+
+      <div id="battleParty" class="battle-party"></div>
+
+      <div class="battle-actions">
+        <button id="battleAttack" class="catch-btn big">💥 התקפה!</button>
+        <button id="battleFlee" class="pill-btn">🏳️ יציאה מהקרב</button>
+      </div>
     </div>
   </div>
 
