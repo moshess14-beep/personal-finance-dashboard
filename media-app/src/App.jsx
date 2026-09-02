@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, ListTree } from 'lucide-react'
+import { Plus, ListTree, Archive } from 'lucide-react'
 import useLibraryStore from './store/useLibraryStore'
 import Header from './components/Header'
 import AddBar from './components/AddBar'
 import HomeTiles from './components/HomeTiles'
 import CategoryView from './components/CategoryView'
+import ArchiveView from './components/ArchiveView'
 import FiltersBar from './components/FiltersBar'
 import AddFlow from './components/AddFlow'
 import ItemDetail from './components/ItemDetail'
@@ -72,7 +73,12 @@ export default function App() {
   const [openItemId, setOpenItemId] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
   const [toast, setToast] = useState(null)
+
+  // פריטים פעילים בלבד (לא בארכיון) — מסך הבית והקטגוריות מציגים רק אותם
+  const activeItems = useMemo(() => items.filter((it) => !it.archived), [items])
+  const archivedItems = useMemo(() => items.filter((it) => it.archived), [items])
 
   useEffect(() => {
     migrateLegacyItems()
@@ -105,9 +111,9 @@ export default function App() {
   const categoryItems = useMemo(
     () =>
       category
-        ? items.filter((it) => (category.builtin ? category.types.includes(it.type) : it.categoryId === category.id))
+        ? activeItems.filter((it) => (category.builtin ? category.types.includes(it.type) : it.categoryId === category.id))
         : [],
-    [items, category],
+    [activeItems, category],
   )
 
   const filtered = useMemo(
@@ -154,16 +160,25 @@ export default function App() {
               onName={() => startAdd({ mode: 'name', category: null })}
               onLink={() => startAdd({ mode: 'link', category: null })}
             />
-            <div className="flex justify-end mt-3">
+            <div className="flex justify-end gap-2 mt-4">
+              {archivedItems.length > 0 && (
+                <button
+                  onClick={() => setShowArchive(true)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm active:scale-95 transition"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  ארכיון ({archivedItems.length})
+                </button>
+              )}
               <button
                 onClick={() => setShowCategoryManager(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5"
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm active:scale-95 transition"
               >
                 <ListTree className="w-3.5 h-3.5" />
                 ניהול קטגוריות
               </button>
             </div>
-            <HomeTiles categories={categories} items={items} onOpen={openCategory} />
+            <HomeTiles categories={categories} items={activeItems} onOpen={openCategory} />
           </>
         ) : (
           <CategoryView
@@ -223,6 +238,14 @@ export default function App() {
       {openItem && <ItemDetail item={openItem} onClose={() => setOpenItemId(null)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showCategoryManager && <CategoryManagerModal onClose={() => setShowCategoryManager(false)} />}
+      {showArchive && (
+        <ArchiveView
+          items={archivedItems}
+          categories={categories}
+          onOpenItem={setOpenItemId}
+          onClose={() => setShowArchive(false)}
+        />
+      )}
 
       {toast && (
         <div className="fixed bottom-40 inset-x-0 flex justify-center z-50 pointer-events-none">

@@ -138,6 +138,31 @@ const useLibraryStore = create(
         syncHooks?.onRemove?.(id)
       },
 
+      // העברה לארכיון / שחזור — הפריט נשאר בענן ומסתנכרן, רק מקבל דגל archived
+      archiveItem: (id) => {
+        let updated = null
+        set((s) => ({
+          items: s.items.map((it) => {
+            if (it.id !== id) return it
+            updated = { ...it, archived: true }
+            return updated
+          }),
+        }))
+        if (updated) syncHooks?.onUpdate?.(updated)
+      },
+
+      unarchiveItem: (id) => {
+        let updated = null
+        set((s) => ({
+          items: s.items.map((it) => {
+            if (it.id !== id) return it
+            updated = { ...it, archived: false }
+            return updated
+          }),
+        }))
+        if (updated) syncHooks?.onUpdate?.(updated)
+      },
+
       // עדכון מלא של הרשימה — משמש רק לסנכרון (מיזוג מקומי+ענן, עדכון realtime)
       replaceItems: (items) => set({ items }),
 
