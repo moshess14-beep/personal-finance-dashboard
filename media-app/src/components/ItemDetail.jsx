@@ -13,6 +13,8 @@ import {
   Undo2,
   Sparkles,
   ShoppingCart,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react'
 import Modal from './Modal'
 import Cover from './Cover'
@@ -62,6 +64,8 @@ function ToggleChips({ label, options, selected, onToggle, single }) {
 export default function ItemDetail({ item, onClose }) {
   const updateItem = useLibraryStore((s) => s.updateItem)
   const removeItem = useLibraryStore((s) => s.removeItem)
+  const archiveItem = useLibraryStore((s) => s.archiveItem)
+  const unarchiveItem = useLibraryStore((s) => s.unarchiveItem)
   const tmdbKey = useLibraryStore((s) => s.tmdbKey)
   const aiKey = useLibraryStore((s) => s.aiKey)
   const categories = useLibraryStore((s) => s.categories)
@@ -664,6 +668,18 @@ export default function ItemDetail({ item, onClose }) {
             className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-teal-600"
           />
         </div>
+
+        <button
+          onClick={() => {
+            if (item.archived) unarchiveItem(item.id)
+            else archiveItem(item.id)
+            onClose()
+          }}
+          className="w-full flex items-center justify-center gap-1.5 text-sm font-bold rounded-2xl py-2.5 bg-slate-100 text-slate-600 transition"
+        >
+          {item.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+          {item.archived ? 'שחזור מהארכיון' : 'העברה לארכיון'}
+        </button>
 
         <button
           onClick={() => {
